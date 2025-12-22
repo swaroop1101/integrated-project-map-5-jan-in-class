@@ -1,83 +1,169 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import axios from "axios";
 import { Settings } from "lucide-react";
 
 function Account() {
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    alert("Account updated successfully ✅");
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    phone: "",
+    email: "",
+    city: "",
+    state: "",
+    country: "",
+    pincode: "",
+    bio: "",
+  });
+
+  // -------------------------
+  // Fetch profile from backend
+  // -------------------------
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await axios.get(
+          "http://localhost:5000/api/user/me",
+          { withCredentials: true }
+        );
+
+        const u = res.data.user;
+
+        setUser(u);
+        setFormData({
+          firstName: u.firstName || "",
+          lastName: u.lastName || "",
+          phone: u.phone || "",
+          email: u.email || "",
+          city: u.location?.city || "",
+          state: u.location?.state || "",
+          country: u.location?.country || "",
+          pincode: u.location?.pincode || "",
+          bio: u.bio || "",
+        });
+      } catch (err) {
+        console.error("Failed to load profile", err);
+        alert("Failed to load profile");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
+  // -------------------------
+  // Input handler
+  // -------------------------
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
+
+  // -------------------------
+  // Save profile
+  // -------------------------
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      await axios.put(
+        "http://localhost:5000/api/user/me",
+        {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phone: formData.phone,
+          bio: formData.bio,
+          location: {
+            city: formData.city,
+            state: formData.state,
+            country: formData.country,
+            pincode: formData.pincode,
+          },
+        },
+        { withCredentials: true }
+      );
+
+      alert("Account updated successfully ✅");
+    } catch (err) {
+      console.error("Update failed", err);
+      alert("Failed to update profile");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center text-gray-600">
+        Loading account...
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 p-4">
-      {/* Profile Card (Top Row) */}
-      <div className="w-full bg-white/30 backdrop-blur-2xl border border-white/50 rounded-3xl shadow-lg p-6 flex flex-col md:flex-row items-center gap-6 transition-all duration-300 hover:shadow-2xl">
-        {/* Avatar */}
-        <div className="w-36 h-36 flex-shrink-0">
+
+      {/* ================= Profile Card ================= */}
+      <div className="w-full bg-white/30 backdrop-blur-2xl border border-white/50 rounded-3xl shadow-lg p-6 flex flex-col md:flex-row items-center gap-6">
+        <div className="w-36 h-36">
           <img
-            src="/swaroopProfile.jpg"
+            src={user?.avatarUrl || "/default-avatar.png"}
             alt="Profile"
-            className="w-full h-full object-cover rounded-full shadow-xl transition-transform duration-500 hover:scale-105"
+            className="w-full h-full object-cover rounded-full shadow-xl"
           />
         </div>
 
-        {/* Info + Buttons */}
-        <div className="flex flex-col justify-center gap-2 flex-1 text-center md:text-left">
-          <h2 className="text-2xl font-bold text-gray-800">Swaroop Bhati</h2>
-          <p className="text-sm text-gray-700">Role: Fresher</p>
-          <p className="text-xs italic text-gray-600 mb-2">Software Intern</p>
-          <p className="text-gray-700 text-sm">
-            Passionate about coding and building modern web apps.
+        <div className="flex flex-col gap-2 flex-1 text-center md:text-left">
+          <h2 className="text-2xl font-bold text-gray-800">
+            {formData.firstName} {formData.lastName}
+          </h2>
+          <p className="text-sm text-gray-700">{formData.email}</p>
+          <p className="text-gray-600 text-sm">
+            {formData.bio || "No bio added yet"}
           </p>
 
           <div className="flex justify-center md:justify-start gap-3 mt-3">
-            <button className="flex items-center gap-2 bg-indigo-500/50 backdrop-blur-sm text-white font-semibold px-3 py-2 rounded-xl shadow-md hover:bg-indigo-500 hover:scale-105 transition-all duration-300">
+            <button className="flex items-center gap-2 bg-indigo-500/60 text-white px-3 py-2 rounded-xl">
               <Settings className="w-4 h-4" /> Edit
-            </button>
-            <button className="bg-gradient-to-r from-cyan-400 to-indigo-500 text-white font-semibold px-3 py-2 rounded-xl shadow-md hover:scale-105 hover:from-cyan-500 hover:to-indigo-600 transition-all duration-300">
-              Portfolio
             </button>
           </div>
         </div>
       </div>
 
-      {/* Account Settings Form (Bottom Row) */}
-      <div className="w-full bg-white/30 backdrop-blur-2xl border border-white/50 rounded-3xl p-6 shadow-lg transition-all duration-300 hover:shadow-2xl">
+      {/* ================= Account Settings ================= */}
+      <div className="w-full bg-white/30 backdrop-blur-2xl border border-white/50 rounded-3xl p-6 shadow-lg">
         <h3 className="text-xl font-semibold mb-6 border-b pb-2 text-gray-800">
           Account Settings
         </h3>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              ["First Name", "Enter your first name"],
-              ["Last Name", "Enter your last name"],
-              ["Phone Number", "Enter your phone number"],
-              ["Email Address", "eg. swaroop@email.com"],
-              ["City", "Enter your city"],
-              ["State", "Enter your state"],
-              ["Pin Code", "Enter your pincode"],
-              ["Country", "Enter your country"],
-            ].map(([label, placeholder], idx) => (
-              <div key={idx}>
-                <label className="block text-gray-700 text-lg">{label}</label>
-                <input
-                  type="text"
-                  className="w-full mt-1 p-2 border border-white/50 rounded-xl bg-white/20 backdrop-blur-sm focus:ring-2 focus:ring-indigo-600 text-gray-800 placeholder-gray-500 transition-all duration-300"
-                  placeholder={placeholder}
-                />
-              </div>
-            ))}
+
+            <Input label="First Name" name="firstName" value={formData.firstName} onChange={handleChange} />
+            <Input label="Last Name" name="lastName" value={formData.lastName} onChange={handleChange} />
+            <Input label="Phone Number" name="phone" value={formData.phone} onChange={handleChange} />
+            <Input label="Email Address" value={formData.email} disabled />
+            <Input label="City" name="city" value={formData.city} onChange={handleChange} />
+            <Input label="State" name="state" value={formData.state} onChange={handleChange} />
+            <Input label="Country" name="country" value={formData.country} onChange={handleChange} />
+            <Input label="Pin Code" name="pincode" value={formData.pincode} onChange={handleChange} />
+
             <div className="md:col-span-2">
               <label className="block text-gray-700 text-lg">Bio</label>
               <textarea
+                name="bio"
                 rows={4}
-                className="w-full mt-1 p-2 border border-white/50 rounded-xl bg-white/20 backdrop-blur-sm focus:ring-2 focus:ring-indigo-600 text-gray-800 placeholder-gray-500 transition-all duration-300"
+                value={formData.bio}
+                onChange={handleChange}
+                className="w-full mt-1 p-2 rounded-xl bg-white/20 border border-white/50"
                 placeholder="Write about yourself..."
               />
             </div>
           </div>
+
           <button
             type="submit"
-            className="mt-4 bg-indigo-700/70 hover:bg-indigo-900 text-white px-6 py-2 rounded-xl shadow-md transition-all duration-300"
+            className="mt-4 bg-indigo-700 hover:bg-indigo-900 text-white px-6 py-2 rounded-xl"
           >
             Save
           </button>
@@ -86,5 +172,18 @@ function Account() {
     </div>
   );
 }
+
+// -------------------------
+// Reusable Input Component
+// -------------------------
+const Input = ({ label, ...props }) => (
+  <div>
+    <label className="block text-gray-700 text-lg">{label}</label>
+    <input
+      {...props}
+      className="w-full mt-1 p-2 rounded-xl bg-white/20 border border-white/50"
+    />
+  </div>
+);
 
 export default Account;

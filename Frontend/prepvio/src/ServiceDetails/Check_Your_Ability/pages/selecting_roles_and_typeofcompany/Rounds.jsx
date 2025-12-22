@@ -27,20 +27,41 @@ const Rounds = ({ companyType, role }) => {
   }, [companyType, role]);
 
   const handleStartInterview = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      stream.getTracks().forEach(track => track.stop());
-      
-      // ✅ Navigate to the correct interview path
-      navigate("/services/check-your-ability/interview", { 
-        state: { companyType, role, rounds, preventBack: true },
-        replace: true
-      });
+  try {
+    // Camera permission check
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    stream.getTracks().forEach(track => track.stop());
 
-    } catch (error) {
-      alert("⚠️ Please allow camera access to start the interview.");
-    }
-  };
+    // 🔴 Create interview session in backend
+    const res = await axios.post(
+      "http://localhost:5000/api/interview-session/start",
+      {
+        companyType,
+        role,
+      },
+      { withCredentials: true }
+    );
+
+    const sessionId = res.data.sessionId;
+
+    // Navigate with sessionId
+    navigate("/services/check-your-ability/interview", {
+      state: {
+        companyType,
+        role,
+        rounds,
+        sessionId,
+        preventBack: true,
+      },
+      replace: true,
+    });
+
+  } catch (error) {
+    console.error(error);
+    alert("⚠️ Please allow camera access or login again.");
+  }
+};
+
 
   if (loading)
     return (

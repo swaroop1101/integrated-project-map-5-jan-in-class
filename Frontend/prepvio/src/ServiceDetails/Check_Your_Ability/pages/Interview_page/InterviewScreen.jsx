@@ -4,6 +4,8 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { Environment, useGLTF } from "@react-three/drei";
 import { useNavigate } from "react-router-dom";
 import Editor from "@monaco-editor/react";
+import { useLocation } from "react-router-dom";
+
 
 // --- Code Editor Modal Component (fixed + robust) ---
 const CodeEditorModal = ({ isOpen, onClose, problem, onSuccess, onSkip }) => {
@@ -636,6 +638,8 @@ const InterviewScreen = ({
   const chatEndRef = useRef(null);
   const recognitionRef = useRef(null);
   const speechBufferRef = useRef("");
+const location = useLocation();
+
 
   
 
@@ -1192,63 +1196,97 @@ Keep it concise and actionable.`;
 
 
   const handleEndInterview = useCallback(async () => {
-    if (isLoadingAI || isSpeaking) return;
+  if (isLoadingAI || isSpeaking) return;
 
-    if (window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
+  if (window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+  }
+  if (recognitionRef.current) {
+    recognitionRef.current.stop();
+    recognitionRef.current = null;
+  }
+
+  const reportText = generateReportContent(chatMessages, companyType, role);
+  const sanitizedRole = role.replace(/[^a-zA-Z0-9]/g, "_");
+  const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, "");
+  const filename = `${sanitizedRole}_Report_${timestamp}.pdf`;
+
+  setIsLoadingAI(true);
+  setError("Analyzing the Interview");
+
+  try {
+    // 1️⃣ Upload PDF
+    const response = await fetch(BACKEND_UPLOAD_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filename,
+        content: reportText,
+        role,
+        companyType,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.details || data.error || "Upload failed");
     }
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
+
+    console.log("✅ Uploaded Report URL:", data.publicUrl);
+
+    // 2️⃣ Save to InterviewSession in DB
+    const sessionId = location.state?.sessionId;
+
+    if (sessionId) {
+      await fetch(
+        `http://localhost:5000/api/interview-session/complete/${sessionId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            reportUrl: data.publicUrl,
+          }),
+        }
+      );
+    } else {
+      console.warn("⚠️ No sessionId found. Interview not linked in DB.");
     }
 
-    const reportText = generateReportContent(chatMessages, companyType, role);
-    const sanitizedRole = role.replace(/[^a-zA-Z0-9]/g, '_');
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
-    const filename = `${sanitizedRole}_Report_${timestamp}.pdf`;
+    // 3️⃣ Optional local storage (UI convenience)
+    localStorage.setItem(
+      "interviewReport",
+      JSON.stringify({
+        role,
+        companyType,
+        reportUrl: data.publicUrl,
+        timestamp: new Date().toISOString(),
+      })
+    );
 
-    setIsLoadingAI(true);
-    setError("Analyzing the Interview");
+    setError("✅ Report saved! Redirecting to summary page...");
 
-    try {
-      const response = await fetch(BACKEND_UPLOAD_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filename,
-          content: reportText,
-          role,
-          companyType,
-        }),
-      });
+    setTimeout(() => {
+      setError(null);
+      navigate("/after-interview", { replace: true });
+    }, 2500);
+  } catch (err) {
+    console.error("❌ Interview completion failed:", err);
+    setError(`❌ Report upload failed: ${err.message}`);
+  } finally {
+    setIsLoadingAI(false);
+  }
+}, [
+  chatMessages,
+  companyType,
+  role,
+  isLoadingAI,
+  isSpeaking,
+  navigate,
+  location,
+]);
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setError(`Report saved! Redirecting to summary page...`);
-        console.log("Uploaded Report URL:", data.publicUrl);
-
-        localStorage.setItem("interviewReport", JSON.stringify({
-          role,
-          companyType,
-          reportUrl: data.publicUrl,
-          timestamp: new Date().toISOString(),
-        }));
-
-        setTimeout(() => {
-          setError(null);
-          navigate("/after-interview", { replace: true });
-        }, 3000);
-      } else {
-        throw new Error(data.details || data.error || "Unknown upload error.");
-      }
-    } catch (err) {
-      console.error("Upload failed:", err);
-      setError(`❌ Report upload failed: ${err.message}. Please try again.`);
-    } finally {
-      setIsLoadingAI(false);
-    }
-  }, [chatMessages, companyType, role, setStage, isLoadingAI, isSpeaking, navigate]);
 
   useEffect(() => {
     const startCamera = async () => {

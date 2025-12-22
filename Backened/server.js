@@ -12,6 +12,9 @@ import { ConnectDB } from "./DB/ConnectDB.js";
 import companyRoutes from "./check-your-ability/routes/companyRoutes.js";
 import interviewRoutes from "./check-your-ability/routes/interviewRoutes.js";
 import Authroute from "./Routes/Authroute.js";
+import interviewSessionRoutes from "./check-your-ability/routes/interviewSessionRoutes.js";
+import userRoutes from "./Routes/userRoutes.js";
+
 
 dotenv.config();
 const app = express();
@@ -25,6 +28,8 @@ app.use(cors({
 // --- 2. Middleware ---
 app.use(express.json());
 app.use(cookieParser());
+app.use("/api/interview-session", interviewSessionRoutes);
+
 
 // --- 3. MongoDB Connection ---
 mongoose
@@ -354,6 +359,9 @@ app.post("/run", async (req, res) => {
 app.use("/api/auth", Authroute);
 app.use("/api/companies", companyRoutes);
 app.use("/api/interview", interviewRoutes);
+app.use("/api/user", userRoutes);
+
+
 
 // --- 8. Health checks ---
 app.get("/", (req, res) => {
