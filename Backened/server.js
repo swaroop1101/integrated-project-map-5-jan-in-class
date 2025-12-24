@@ -15,6 +15,10 @@ import Authroute from "./Routes/Authroute.js";
 import interviewSessionRoutes from "./check-your-ability/routes/interviewSessionRoutes.js";
 import userRoutes from "./Routes/userRoutes.js";
 
+const nervousCaptures = new Map();
+import fs from "fs";
+
+
 
 dotenv.config();
 const app = express();
@@ -51,35 +55,302 @@ const r2Client = new S3Client({
 });
 
 // --- 5. PDF Generation & Upload Route ---
+// app.post("/api/upload", async (req, res) => {
+//   try {
+//     const {
+//       filename,
+//       content,
+//       role,
+//       companyType,
+//       solvedProblems = [],
+//       sessionId, // 🔴 REQUIRED
+//     } = req.body;
+
+//     if (!filename || !content) {
+//       return res.status(400).json({ error: "Filename and content required." });
+//     }
+
+//     const sanitizedFilename = filename.endsWith(".pdf")
+//       ? filename
+//       : `${filename}.pdf`;
+//     const uniqueFilename = `interviews/${Date.now()}-${sanitizedFilename}`;
+
+//     // ✅ FETCH NERVOUS DATA FROM MEMORY (NOT PYTHON)
+//     let nervousData = null;
+//     if (sessionId && nervousCaptures.has(sessionId)) {
+//       nervousData = nervousCaptures.get(sessionId);
+//     }
+
+//     const pdfBuffer = await new Promise((resolve, reject) => {
+//       const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true });
+//       const chunks = [];
+
+//       const pageWidth = doc.page.width;
+//       const pageHeight = doc.page.height;
+//       const margin = 50;
+//       const contentWidth = pageWidth - 2 * margin;
+//       const userIndent = 200;
+
+//       /* ================= HEADER ================= */
+//       doc.fillColor("#1E40AF").rect(0, 0, pageWidth, 80).fill();
+//       doc.fillColor("#FFFFFF")
+//         .fontSize(20)
+//         .font("Helvetica-Bold")
+//         .text("Mock Interview Report", margin, 25);
+
+//       doc.fontSize(11)
+//         .font("Helvetica")
+//         .text(
+//           `Role: ${role || "N/A"}  •  Company Type: ${companyType || "N/A"}  •  Date: ${new Date().toLocaleDateString()}`,
+//           margin,
+//           55
+//         );
+
+//       doc.moveDown(4);
+
+//       /* ================= CONVERSATION LOG ================= */
+//       doc.fillColor("#111827")
+//         .font("Helvetica-Bold")
+//         .fontSize(16)
+//         .text("Conversation Log");
+
+//       doc.moveDown(1);
+
+//       const lines = content.split("\n");
+//       let codingSectionRendered = false;
+//       let nervousSectionRendered = false;
+
+//       for (let i = 0; i < lines.length; i++) {
+//         const trimmed = lines[i].trim();
+//         if (!trimmed) {
+//           doc.moveDown(0.5);
+//           continue;
+//         }
+
+//         /* ===== INSERT NERVOUS SECTION BEFORE FINAL ANALYSIS ===== */
+//         // Replace the nervous section in your PDF generation (inside pdfBuffer creation)
+
+// /* ===== INSERT NERVOUS SECTION BEFORE FINAL ANALYSIS ===== */
+// if (
+//   trimmed === "=== FINAL ANALYSIS ===" &&
+//   !nervousSectionRendered
+// ) {
+//   nervousSectionRendered = true;
+
+//   if (nervousData?.imagePath) {
+//     doc.addPage();
+
+//     doc.font("Helvetica-Bold")
+//       .fontSize(16)
+//       .fillColor("#111827")
+//       .text("Behavioral Observation (Nervousness Detection)");
+
+//     doc.moveDown(1);
+
+//     doc.font("Helvetica")
+//       .fontSize(11)
+//       .fillColor("#374151")
+//       .text(
+//         "During the interview, moments of elevated nervousness were detected based on facial micro-movements, eye blink patterns, head pose variations, and lip movements.",
+//         { width: contentWidth }
+//       );
+
+//     doc.moveDown(0.8);
+
+//     if (typeof nervousData.score === "number") {
+//       doc.font("Helvetica-Bold")
+//         .fillColor("#92400E")
+//         .text(
+//           `Peak Nervousness Score: ${nervousData.score.toFixed(2)} / 1.00`
+//         );
+//       doc.moveDown(0.6);
+//     }
+
+//     // Try to load the image from the Python-saved path
+//     try {
+//       const fs = require('fs');
+      
+//       // Verify file exists
+//       if (fs.existsSync(nervousData.imagePath)) {
+//         doc.image(nervousData.imagePath, {
+//           fit: [400, 300],
+//           align: "center",
+//         });
+//         console.log("✅ Nervousness image added to PDF");
+//       } else {
+//         console.warn("⚠️ Image file not found:", nervousData.imagePath);
+//         doc.font("Helvetica-Oblique")
+//           .fontSize(10)
+//           .fillColor("#6B7280")
+//           .text("Nervousness image unavailable (file not found).");
+//       }
+//     } catch (imgErr) {
+//       console.error("❌ Error loading nervousness image:", imgErr.message);
+//       doc.font("Helvetica-Oblique")
+//         .fontSize(10)
+//         .fillColor("#6B7280")
+//         .text("Nervousness image unavailable (loading error).");
+//     }
+
+//     doc.moveDown(1);
+
+//     doc.font("Helvetica-Oblique")
+//       .fontSize(10)
+//       .fillColor("#6B7280")
+//       .text(
+//         "Note: Nervousness during interviews is common and does not negatively reflect technical ability. This data is for self-improvement only.",
+//         { width: contentWidth }
+//       );
+//   } else {
+//     console.log("ℹ️ No nervousness data captured during this interview");
+//   }
+// }
+
+//         /* ===== FINAL ANALYSIS HEADER ===== */
+//         if (trimmed === "=== FINAL ANALYSIS ===") {
+//           doc.fillColor("#059669")
+//             .font("Helvetica-Bold")
+//             .fontSize(18)
+//             .text("Performance Analysis & Recommendations");
+//           doc.moveDown(1);
+//           continue;
+//         }
+
+//         /* ===== CHAT MESSAGES ===== */
+//         if (trimmed.startsWith("AI:") || trimmed.startsWith("Assistant:")) {
+//           doc.fillColor("#1E40AF")
+//             .font("Helvetica-Bold")
+//             .fontSize(10)
+//             .text("AI Interviewer:", { continued: true });
+
+//           doc.fillColor("#111827")
+//             .font("Helvetica")
+//             .text(
+//               trimmed.replace(/^(AI:|Assistant:)\s*/i, ""),
+//               { width: contentWidth }
+//             );
+
+//           doc.moveDown(0.5);
+//           continue;
+//         }
+
+//         if (trimmed.startsWith("User:")) {
+//           doc.x = margin + userIndent;
+//           doc.fillColor("#059669")
+//             .font("Helvetica-Bold")
+//             .fontSize(10)
+//             .text("You:", { continued: true });
+
+//           doc.fillColor("#111827")
+//             .font("Helvetica")
+//             .text(trimmed.replace(/^User:\s*/i, ""), {
+//               width: contentWidth - userIndent,
+//             });
+
+//           doc.x = margin;
+//           doc.moveDown(0.5);
+//           continue;
+//         }
+
+//         doc.fillColor("#374151")
+//           .font("Helvetica")
+//           .fontSize(11)
+//           .text(trimmed, { width: contentWidth });
+
+//         doc.moveDown(0.3);
+//       }
+
+//       doc.end();
+//       doc.on("data", (chunk) => chunks.push(chunk));
+//       doc.on("end", () => resolve(Buffer.concat(chunks)));
+//       doc.on("error", reject);
+//     });
+
+//     await r2Client.send(
+//       new PutObjectCommand({
+//         Bucket: process.env.R2_BUCKET_NAME,
+//         Key: uniqueFilename,
+//         Body: pdfBuffer,
+//         ContentType: "application/pdf",
+//       })
+//     );
+
+//     // ✅ CLEANUP
+//     if (sessionId) nervousCaptures.delete(sessionId);
+
+//     const publicUrl = `https://${process.env.R2_PUBLIC_DOMAIN}/${uniqueFilename}`;
+//     res.json({ success: true, publicUrl });
+//   } catch (err) {
+//     console.error("PDF Upload Error:", err);
+//     res.status(500).json({ error: "Upload failed", details: err.message });
+//   }
+// });
+
 app.post("/api/upload", async (req, res) => {
   try {
-    const { filename, content, role, companyType } = req.body;
-    if (!filename || !content)
+    const {
+      filename,
+      content,
+      role,
+      companyType,
+      solvedProblems = [],
+      sessionId, // REQUIRED
+    } = req.body;
+
+    if (!filename || !content) {
       return res.status(400).json({ error: "Filename and content required." });
+    }
 
     const sanitizedFilename = filename.endsWith(".pdf")
       ? filename
       : `${filename}.pdf`;
+
     const uniqueFilename = `interviews/${Date.now()}-${sanitizedFilename}`;
+
+    // ✅ FETCH NERVOUS DATA FROM MEMORY
+    let nervousData = null;
+    if (sessionId && nervousCaptures.has(sessionId)) {
+      nervousData = nervousCaptures.get(sessionId);
+    }
 
     const pdfBuffer = await new Promise((resolve, reject) => {
       const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true });
       const chunks = [];
 
       const pageWidth = doc.page.width;
-      const pageHeight = doc.page.height;
       const margin = 50;
       const contentWidth = pageWidth - 2 * margin;
       const userIndent = 200;
 
-      // Header
+      /* ================= HEADER ================= */
       doc.fillColor("#1E40AF").rect(0, 0, pageWidth, 80).fill();
-      doc.fillColor("#FFFFFF").fontSize(20).font("Helvetica-Bold").text("AI Mock Interview Report", margin, 25);
-      doc.fontSize(11).font("Helvetica").text(`Position: ${role || "N/A"}  •  Company: ${companyType || "N/A"}`, margin, 55);
-      doc.moveDown(2);
+      doc.fillColor("#FFFFFF")
+        .fontSize(20)
+        .font("Helvetica-Bold")
+        .text("Mock Interview Report", margin, 25);
+
+      doc.fontSize(11)
+        .font("Helvetica")
+        .text(
+          `Role: ${role || "N/A"}  •  Company Type: ${
+            companyType || "N/A"
+          }  •  Date: ${new Date().toLocaleDateString()}`,
+          margin,
+          55
+        );
+
+      doc.moveDown(4);
+
+      /* ================= CONVERSATION LOG ================= */
+      doc.fillColor("#111827")
+        .font("Helvetica-Bold")
+        .fontSize(16)
+        .text("Conversation Log");
+
+      doc.moveDown(1);
 
       const lines = content.split("\n");
-      let lastUserMessage = false;
+      let nervousSectionRendered = false;
 
       for (let i = 0; i < lines.length; i++) {
         const trimmed = lines[i].trim();
@@ -88,229 +359,129 @@ app.post("/api/upload", async (req, res) => {
           continue;
         }
 
-        // === FINAL ANALYSIS ===
-        if (trimmed === "=== FINAL ANALYSIS ===") {
-          doc.addPage();
-          doc.moveDown(0.5);
-          doc.fillColor("#059669")
-            .fontSize(18)
-            .font("Helvetica-Bold")
-            .text("--- Performance Analysis & Recommendations ---", { lineGap: 10 });
-          doc.moveDown(1);
-          lastUserMessage = false;
-          continue;
-        }
+        /* ===== INSERT NERVOUS SECTION BEFORE FINAL ANALYSIS ===== */
+        /* ===== INSERT NERVOUS SECTION BEFORE FINAL ANALYSIS ===== */
+if (trimmed === "=== FINAL ANALYSIS ===" && !nervousSectionRendered) {
+  nervousSectionRendered = true;
 
-        let prefix = "";
-        let message = trimmed;
-        let isChat = false;
-        let currentX = margin;
-        let chatWidth = contentWidth;
+  if (nervousData?.imageBase64) {
+    doc.addPage();
 
-        // --- Horizontal Line before AI Interview Section ---
-        if (trimmed.startsWith("AI:") || trimmed.startsWith("Assistant:")) {
-          doc.moveDown(0.5);
-          doc.strokeColor("#9CA3AF")
-            .lineWidth(0.5)
-            .moveTo(margin, doc.y)
-            .lineTo(pageWidth - margin, doc.y)
-            .stroke();
-          doc.moveDown(0.5);
-        }
+    doc.font("Helvetica-Bold")
+      .fontSize(16)
+      .fillColor("#111827")
+      .text("Behavioral Observation (Nervousness Detection)");
 
-        // Chat message types
-        if (trimmed.startsWith("AI:") || trimmed.startsWith("Assistant:")) {
-          isChat = true;
-          lastUserMessage = false;
-          prefix = "AI Interviewer: ";
-          message = trimmed.replace(/^(AI:|Assistant:)\s*/i, "").trim();
-          doc.fillColor("#1E40AF").font("Helvetica-Bold").fontSize(10);
-        } else if (trimmed.startsWith("User:")) {
-          isChat = true;
-          lastUserMessage = true;
-          prefix = "You: ";
-          message = trimmed.replace(/^User:\s*/i, "").trim();
-          doc.fillColor("#059669").font("Helvetica-Bold").fontSize(10);
-          currentX = margin + userIndent;
-          chatWidth = contentWidth - userIndent;
-        }
+    doc.moveDown(1);
 
-        if (isChat) {
-          doc.x = currentX;
-          doc.text(prefix, { continued: true, width: chatWidth });
-          doc.fillColor("#333333").font("Helvetica").text(message, { width: chatWidth });
-          doc.moveDown(0.5);
+    doc.font("Helvetica")
+      .fontSize(11)
+      .fillColor("#374151")
+      .text(
+        "During the interview, moments of elevated nervousness were detected based on facial micro-movements, eye blink patterns, head pose variations, and lip movements.",
+        { width: contentWidth }
+      );
 
-          // 🟡 Immediately check next line for feedback
-          const nextLine = lines[i + 1] ? lines[i + 1].trim() : "";
-          if (
-            lastUserMessage &&
-            (nextLine.startsWith("[Feedback]:") ||
-              nextLine.startsWith("Suggestions for Improvement:"))
-          ) {
-            const feedbackLine = lines[i + 1].trim();
-            let suggestion = "";
-            let exampleImprovement = "";
+    doc.moveDown(0.8);
 
-            if (feedbackLine.startsWith("[Feedback]:")) {
-              const fullFeedback = feedbackLine.replace(/^\[Feedback]:\s*/i, "").trim();
-              const parts = fullFeedback.split("|||");
-              suggestion = parts[0].trim();
-              exampleImprovement = parts[1] ? parts[1].trim() : "";
-            } else {
-              suggestion = feedbackLine.replace("Suggestions for Improvement:", "").trim();
-              const possibleExample = lines[i + 2] ? lines[i + 2].trim() : "";
-              if (possibleExample.startsWith("Example Improvement:")) {
-                exampleImprovement = possibleExample.replace("Example Improvement:", "").trim();
-              }
-            }
+    if (typeof nervousData.score === "number") {
+      doc.font("Helvetica-Bold")
+        .fillColor("#92400E")
+        .text(
+          `Peak Nervousness Score: ${nervousData.score.toFixed(2)} / 1.00`
+        );
+      doc.moveDown(0.6);
+    }
 
-            // ✅ PROPERLY CALCULATE BOX HEIGHT
-            const feedbackX = margin + userIndent;
-            const feedbackWidth = contentWidth - userIndent;
-            const padding = 10;
-
-            // Calculate heights for each component
-            doc.font("Helvetica-Bold").fontSize(10);
-            const headerHeight = doc.heightOfString("SUGGESTION:", {
-              width: feedbackWidth - 2 * padding,
-            });
-            
-            doc.font("Helvetica").fontSize(9);
-            const suggestionHeight = doc.heightOfString(suggestion, {
-              width: feedbackWidth - 2 * padding,
-              lineGap: 3,
-            });
-
-            let exampleHeight = 0;
-            if (exampleImprovement) {
-              doc.font("Helvetica-Bold").fontSize(9);
-              const exampleHeaderHeight = doc.heightOfString("Example Improvement:", {
-                width: feedbackWidth - 2 * padding,
-              });
-              doc.font("Helvetica").fontSize(9);
-              const exampleTextHeight = doc.heightOfString(exampleImprovement, {
-                width: feedbackWidth - 2 * padding,
-                lineGap: 3,
-              });
-              exampleHeight = exampleHeaderHeight + exampleTextHeight + 5;
-            }
-
-            const contentInternalHeight = headerHeight + suggestionHeight + exampleHeight;
-            const blockHeight = contentInternalHeight + 2 * padding + 15;
-
-            // Check if we need a new page
-            if (doc.y + blockHeight + 10 > pageHeight - 60) {
-              doc.addPage();
-            }
-
-            const initialY = doc.y;
-
-            // Draw feedback background
-            doc.fillColor("#FFFBEB")
-              .rect(feedbackX, initialY, feedbackWidth, blockHeight)
-              .fill();
-            doc.strokeColor("#FBBF24")
-              .rect(feedbackX, initialY, feedbackWidth, blockHeight)
-              .lineWidth(1.5)
-              .stroke();
-
-            doc.x = feedbackX + padding;
-            let currentTextY = initialY + padding;
-            doc.y = currentTextY;
-
-            // Suggestion Header
-            doc.fillColor("#B45309").font("Helvetica-Bold").fontSize(10);
-            doc.text("SUGGESTION:", { width: feedbackWidth - 2 * padding });
-
-            // Suggestion Body
-            currentTextY = doc.y + 2;
-            doc.y = currentTextY;
-            doc.fillColor("#78350F").font("Helvetica").fontSize(9);
-            doc.text(suggestion, {
-              width: feedbackWidth - 2 * padding,
-              lineGap: 3,
-            });
-
-            // Example Improvement
-            if (exampleImprovement) {
-              currentTextY = doc.y + 5;
-              doc.y = currentTextY;
-
-              doc.fillColor("#B45309").font("Helvetica-Bold").fontSize(9);
-              doc.text("Example Improvement:", { width: feedbackWidth - 2 * padding });
-
-              currentTextY = doc.y + 2;
-              doc.y = currentTextY;
-              doc.fillColor("#78350F").font("Helvetica").fontSize(9);
-              doc.text(exampleImprovement, {
-                width: feedbackWidth - 2 * padding,
-                lineGap: 3,
-              });
-            }
-
-            doc.y = initialY + blockHeight;
-
-            // Full separator after feedback block
-            doc.moveDown(0.5);
-            doc.strokeColor("#9CA3AF")
-              .lineWidth(0.5)
-              .moveTo(margin, doc.y)
-              .lineTo(pageWidth - margin, doc.y)
-              .stroke();
-
-            doc.moveDown(0.5);
-
-            // Skip the feedback line(s) we just processed
-            i++; // Skip [Feedback]: line
-            if (exampleImprovement && lines[i + 1] && lines[i + 1].trim().startsWith("Example Improvement:")) {
-              i++; // Skip Example Improvement line if it was separate
-            }
-          }
-          continue;
-        }
-
-        // Regular analysis content
-        doc.x = margin;
-        doc.fillColor("#333333").font("Helvetica").fontSize(11);
-        if (trimmed.startsWith("**") && trimmed.endsWith("**")) {
-          const headerText = trimmed.replace(/\*\*/g, "");
-          doc.moveDown(0.5);
-          doc.font("Helvetica-Bold").fontSize(12).text(headerText);
-          doc.moveDown(0.5);
-        } else if (trimmed.startsWith("-") || trimmed.startsWith("•")) {
-          const bulletText = trimmed.substring(1).trim();
-          doc.font("Helvetica").fontSize(11);
-          doc.text(`• ${bulletText}`, { indent: 15, lineGap: 3 });
-        } else if (/^\d+\./.test(trimmed)) {
-          doc.font("Helvetica").fontSize(11);
-          doc.text(trimmed, { indent: 15, lineGap: 3 });
-        } else {
-          doc.font("Helvetica").fontSize(11).text(trimmed);
-          doc.moveDown(0.2);
-        }
-      }
-
-      // Footer
-      const footerText = "🤖 Generated by AI Interview Assistant";
-      doc.flushPages();
-      const pageCount = doc.bufferedPageRange().count;
+    // ✅ FIX: Convert base64 to Buffer and embed directly
+    try {
+      // Remove data URL prefix if present
+      const base64Data = nervousData.imageBase64.replace(/^data:image\/\w+;base64,/, '');
       
-      for (let j = 0; j < pageCount; j++) {
-        doc.switchToPage(j);
-        doc.moveTo(margin, pageHeight - 50)
-          .lineTo(pageWidth - margin, pageHeight - 50)
-          .stroke("#9CA3AF");
-        
-        doc.fillColor("#9CA3AF")
-          .fontSize(9)
-          .font("Helvetica-Oblique")
-          .text(footerText, 0, pageHeight - 40, { align: "center", width: pageWidth });
-        
-        doc.text(`Page ${j + 1} of ${pageCount}`, pageWidth - margin - 50, pageHeight - 40, {
-          align: "right",
-          width: 100,
-        });
+      // Convert base64 to Buffer
+      const imageBuffer = Buffer.from(base64Data, 'base64');
+
+      // Embed image directly in PDF
+      doc.image(imageBuffer, {
+        fit: [400, 300],
+        align: "center",
+      });
+
+      console.log("✅ Nervousness image added to PDF from base64");
+    } catch (imgErr) {
+      console.error("❌ Error embedding nervousness image:", imgErr.message);
+      doc.font("Helvetica-Oblique")
+        .fontSize(10)
+        .fillColor("#6B7280")
+        .text("Nervousness image unavailable (embedding error).");
+    }
+
+    doc.moveDown(1);
+
+    doc.font("Helvetica-Oblique")
+      .fontSize(10)
+      .fillColor("#6B7280")
+      .text(
+        "Note: Nervousness during interviews is common and does not negatively reflect technical ability. This data is for self-improvement only.",
+        { width: contentWidth }
+      );
+  } else {
+    console.log("ℹ️ No nervousness data captured during this interview");
+  }
+}
+
+        /* ===== FINAL ANALYSIS HEADER ===== */
+        if (trimmed === "=== FINAL ANALYSIS ===") {
+          doc.fillColor("#059669")
+            .font("Helvetica-Bold")
+            .fontSize(18)
+            .text("Performance Analysis & Recommendations");
+          doc.moveDown(1);
+          continue;
+        }
+
+        /* ===== CHAT MESSAGES ===== */
+        if (trimmed.startsWith("AI:") || trimmed.startsWith("Assistant:")) {
+          doc.fillColor("#1E40AF")
+            .font("Helvetica-Bold")
+            .fontSize(10)
+            .text("AI Interviewer:", { continued: true });
+
+          doc.fillColor("#111827")
+            .font("Helvetica")
+            .text(
+              trimmed.replace(/^(AI:|Assistant:)\s*/i, ""),
+              { width: contentWidth }
+            );
+
+          doc.moveDown(0.5);
+          continue;
+        }
+
+        if (trimmed.startsWith("User:")) {
+          doc.x = margin + userIndent;
+          doc.fillColor("#059669")
+            .font("Helvetica-Bold")
+            .fontSize(10)
+            .text("You:", { continued: true });
+
+          doc.fillColor("#111827")
+            .font("Helvetica")
+            .text(trimmed.replace(/^User:\s*/i, ""), {
+              width: contentWidth - userIndent,
+            });
+
+          doc.x = margin;
+          doc.moveDown(0.5);
+          continue;
+        }
+
+        doc.fillColor("#374151")
+          .font("Helvetica")
+          .fontSize(11)
+          .text(trimmed, { width: contentWidth });
+
+        doc.moveDown(0.3);
       }
 
       doc.end();
@@ -319,14 +490,21 @@ app.post("/api/upload", async (req, res) => {
       doc.on("error", reject);
     });
 
-    // --- Upload to Cloudflare R2 ---
-    const uploadCommand = new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME,
-      Key: uniqueFilename,
-      Body: pdfBuffer,
-      ContentType: "application/pdf",
-    });
-    await r2Client.send(uploadCommand);
+    await r2Client.send(
+      new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: uniqueFilename,
+        Body: pdfBuffer,
+        ContentType: "application/pdf",
+      })
+    );
+
+    // ✅ CLEANUP SESSION MEMORY
+
+    console.log("UPLOAD sessionId:", sessionId);
+console.log("AVAILABLE sessions:", [...nervousCaptures.keys()]);
+
+    if (sessionId) nervousCaptures.delete(sessionId);
 
     const publicUrl = `https://${process.env.R2_PUBLIC_DOMAIN}/${uniqueFilename}`;
     res.json({ success: true, publicUrl });
@@ -335,6 +513,38 @@ app.post("/api/upload", async (req, res) => {
     res.status(500).json({ error: "Upload failed", details: err.message });
   }
 });
+
+
+
+
+
+app.post("/api/nervous-frame", (req, res) => {
+  const { sessionId, imageBase64, score } = req.body;
+
+  if (!sessionId || !imageBase64) {
+    return res.status(400).json({ error: "Missing sessionId or imageBase64" });
+  }
+
+  const existing = nervousCaptures.get(sessionId);
+
+  // Only store if this is the highest score for this session
+  if (!existing || score > existing.score) {
+    nervousCaptures.set(sessionId, {
+      imageBase64,  // Store base64 string
+      score,
+      timestamp: new Date().toISOString(),
+    });
+
+    console.log(`🟡 Stored nervous frame (base64) for session: ${sessionId}, score: ${score.toFixed(2)}`);
+  }
+
+  res.json({ success: true });
+});
+
+
+
+
+
 
 // --- 6. Code Execution Route (Piston API) ---
 app.post("/run", async (req, res) => {

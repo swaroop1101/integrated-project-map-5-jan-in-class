@@ -14,11 +14,13 @@ router.post("/start", verifyToken, async (req, res) => {
     }
 
     const session = await InterviewSession.create({
-      user: req.userId,
+      userId: req.userId,        // ✅ FIXED FIELD
       companyType,
       role,
-      status: "started",
+      status: "in-progress",     // ✅ VALID ENUM
       startedAt: new Date(),
+      messages: [],              // optional but safe
+      solvedProblems: [],        // optional but safe
     });
 
     res.status(201).json({
@@ -31,11 +33,12 @@ router.post("/start", verifyToken, async (req, res) => {
   }
 });
 
+
 // ✅ COMPLETE INTERVIEW SESSION
 router.patch("/complete/:sessionId", verifyToken, async (req, res) => {
   try {
     const { sessionId } = req.params;
-    const { reportUrl } = req.body;
+    const { reportUrl, messages, solvedProblems } = req.body;
 
     if (!reportUrl) {
       return res.status(400).json({ message: "Report URL is required" });
@@ -43,7 +46,7 @@ router.patch("/complete/:sessionId", verifyToken, async (req, res) => {
 
     const session = await InterviewSession.findOne({
       _id: sessionId,
-      user: req.userId,
+      userId: req.userId, // ⚠️ MUST be userId, not user
     });
 
     if (!session) {
@@ -51,26 +54,35 @@ router.patch("/complete/:sessionId", verifyToken, async (req, res) => {
     }
 
     session.reportUrl = reportUrl;
+    session.messages = messages || [];
+    session.solvedProblems = solvedProblems || [];
     session.status = "completed";
-    session.endedAt = new Date();
+    session.completedAt = new Date();
 
     await session.save();
 
     res.json({
       success: true,
-      message: "Interview session updated",
+      message: "Interview completed successfully",
     });
   } catch (err) {
     console.error("Complete interview error:", err);
-    res.status(500).json({ message: "Failed to update interview session" });
+    res.status(500).json({ message: "Failed to complete interview session" });
   }
 });
+
+
 
 // GET all interviews for logged-in user
 router.get("/my", verifyToken, async (req, res) => {
   try {
-    const interviews = await InterviewSession.find({ user: req.userId })
-      .sort({ startedAt: -1 });
+    const interviews = await InterviewSession.find({
+      userId: req.userId,
+    })
+      .sort({ startedAt: -1 })
+      .select(
+        "role companyType startedAt completedAt reportUrl messages solvedProblems status"
+      );
 
     res.json({
       success: true,
@@ -81,6 +93,32 @@ router.get("/my", verifyToken, async (req, res) => {
     res.status(500).json({ message: "Failed to fetch interviews" });
   }
 });
+
+
+
+router.get("/:sessionId", verifyToken, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    const session = await InterviewSession.findOne({
+      _id: sessionId,
+      user: req.userId,
+    });
+
+    if (!session) {
+      return res.status(404).json({ message: "Interview session not found" });
+    }
+
+    res.json({
+      success: true,
+      session,
+    });
+  } catch (err) {
+    console.error("Fetch session error:", err);
+    res.status(500).json({ message: "Failed to fetch interview session" });
+  }
+});
+
 
 
 export default router;

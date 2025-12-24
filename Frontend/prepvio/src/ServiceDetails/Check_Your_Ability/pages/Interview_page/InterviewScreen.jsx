@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { PhoneOff, MessageSquare, Code, Maximize, Minimize, X, Mic } from "lucide-react";
+import { PhoneOff, MessageSquare, Code, Maximize, Minimize, X, Mic, ListChecks } from "lucide-react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Environment, useGLTF } from "@react-three/drei";
 import { useNavigate } from "react-router-dom";
@@ -640,6 +640,10 @@ const InterviewScreen = ({
   const speechBufferRef = useRef("");
 const location = useLocation();
 
+const isPreview = location.state?.isPreview === true;
+const previewSession = location.state?.previewSession;
+
+
 
   
 
@@ -660,6 +664,21 @@ const location = useLocation();
   const [solvedProblems, setSolvedProblems] = useState([]);
   const [showSolvedProblems, setShowSolvedProblems] = useState(false);
   const [deviationWarnings, setDeviationWarnings] = useState(0);
+
+  const captureFrame = () => {
+  const video = userVideoRef.current;
+  if (!video) return null;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0);
+
+  return canvas.toDataURL("image/jpeg", 0.6);
+};
+
 
   // NEW: track how many coding problems attempted in this coding round
   const [codingCount, setCodingCount] = useState(0);
@@ -705,6 +724,104 @@ const location = useLocation();
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [navigate, endInterview]);
+
+  useEffect(() => {
+  if (isPreview && previewSession?.messages) {
+    setChatMessages(previewSession.messages);
+    setSolvedProblems(previewSession.solvedProblems || []);
+    setCameraAllowed(true); // bypass loader screen
+  }
+}, [isPreview, previewSession]);
+
+
+  // Add this hook in your InterviewScreen component
+// Replace the existing useEffect for frame capture
+
+// Replace your frame capture useEffect with this debugged version
+
+useEffect(() => {
+  const sessionId = location.state?.sessionId;
+  
+  if (!sessionId) {
+    console.warn("⚠️ No sessionId found - nervousness detection disabled");
+    return;
+  }
+
+  console.log("📹 Starting nervousness detection for session:", sessionId);
+
+  let frameCount = 0;
+  let successCount = 0;
+  let errorCount = 0;
+
+  const interval = setInterval(() => {
+    frameCount++;
+    
+    const frame = captureFrame();
+    
+    if (!frame) {
+      console.warn(`⚠️ Frame ${frameCount}: Capture returned null`);
+      return;
+    }
+
+    // Log first frame details for debugging
+    if (frameCount === 1) {
+      console.log("📸 First frame captured:", {
+        length: frame.length,
+        prefix: frame.substring(0, 30) + "..."
+      });
+    }
+
+    fetch("http://127.0.0.1:5050/analyze-frame", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: sessionId,
+        frame: frame
+      })
+    })
+    .then(res => {
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+      return res.json();
+    })
+    .then(data => {
+      successCount++;
+      
+      if (data.nervous && data.imagePath) {
+        console.log(`🟡 Frame ${frameCount}: NERVOUS detected (${data.score.toFixed(2)})`);
+        
+        // Store in backend memory
+        return fetch("http://localhost:5000/api/nervous-frame", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: sessionId,
+            imagePath: data.imageBase64,
+            score: data.score
+          })
+        });
+      } else {
+        console.log(`✅ Frame ${frameCount}: Analyzed (score: ${data.score?.toFixed(2) || "N/A"})`);
+      }
+    })
+    .catch(err => {
+      errorCount++;
+      console.error(`❌ Frame ${frameCount} failed:`, err.message);
+      
+      // Log stats every 10 errors
+      if (errorCount % 10 === 0) {
+        console.warn(`📊 Stats: ${successCount} success, ${errorCount} errors out of ${frameCount} frames`);
+      }
+    });
+  }, 4000); // Every 4 seconds
+
+  return () => {
+    clearInterval(interval);
+    console.log(`📹 Detection stopped. Final stats: ${successCount} success, ${errorCount} errors out of ${frameCount} frames`);
+  };
+}, [location.state?.sessionId]);
+
 
   useEffect(() => {
     window.history.pushState(null, "", window.location.pathname);
@@ -1044,58 +1161,98 @@ Keep it concise and actionable.`;
     setIsLoadingAI(true);
 
     try {
-      let systemInstruction = "";
+  let systemInstruction = "";
 
-      if (interviewStage === "intro")
-        systemInstruction =
-          "You are in the intro HR round. Ask only introductory interview questions.";
-      else if (interviewStage === "transition")
-        systemInstruction =
-          "You are in the transition round. Ask light technical or conceptual questions.";
-      else if (interviewStage === "technical")
-        systemInstruction =
-          "You are in the technical round. Ask theory-based technical questions. No coding.";
-      else if (interviewStage === "coding")
-        systemInstruction =
-          "You are in the coding round. Do not generate coding problems.";
-      else if (interviewStage === "final")
-        systemInstruction =
-          "You are in the final HR round. Ask wrap-up interview questions.";
+  if (interviewStage === "intro")
+    systemInstruction = `
+You are an AI interviewer in the INTRO round.
 
-      const formattedHistory = formatHistoryForFireworks([
-        ...chatMessages,
-        userMsg,
-      ]);
+RULES:
+- Ask ONLY ONE question.
+- Question length MUST be between 20 and 25 words.
+- Ask an introductory HR question.
+- Do NOT add explanations, examples, or follow-ups.
+`;
 
-      const aiReply = await fetchFireworksContent(
-        formattedHistory,
-        systemInstruction
-      );
+  else if (interviewStage === "transition")
+    systemInstruction = `
+You are an AI interviewer in the TRANSITION round.
 
-      const feedback = await generateFeedbackForAnswer(
-        messageToSend,
-        lastAiQuestion
-      );
+RULES:
+- Ask ONLY ONE light technical or conceptual question.
+- Question length MUST be between 20 and 25 words.
+- No coding questions.
+- No explanations or follow-ups.
+`;
 
-      setChatMessages((prev) => {
-        const updated = [...prev];
-        const idx = updated.map((m) => m.sender).lastIndexOf("User");
-        if (idx !== -1) updated[idx].feedback = feedback;
-        return updated;
-      });
+  else if (interviewStage === "technical")
+    systemInstruction = `
+You are an AI interviewer in the TECHNICAL round.
 
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          sender: "AI",
-          text: aiReply,
-          time: new Date().toLocaleTimeString(),
-          stage: interviewStage,
-        },
-      ]);
+RULES:
+- Ask ONLY ONE theory-based technical question.
+- Question length MUST be between 20 and 25 words.
+- No coding problems.
+- No multi-part questions.
+`;
 
-      textToSpeech(aiReply);
-    } catch (err) {
+  else if (interviewStage === "coding")
+    systemInstruction = `
+You are in the CODING round.
+Do NOT ask questions. Wait for the user to solve the problem.
+`;
+
+  else if (interviewStage === "final")
+    systemInstruction = `
+You are an AI interviewer in the FINAL round.
+
+RULES:
+- Ask ONLY ONE wrap-up HR question.
+- Question length MUST be between 20 and 25 words.
+- Be concise and professional.
+`;
+
+  const formattedHistory = formatHistoryForFireworks([
+    ...chatMessages,
+    userMsg,
+  ]);
+
+  const aiReplyRaw = await fetchFireworksContent(
+    formattedHistory,
+    systemInstruction
+  );
+
+  // 🔒 HARD SAFETY: trim to max 25 words
+  const aiReply = aiReplyRaw
+    .split(" ")
+    .slice(0, 25)
+    .join(" ");
+
+  const feedback = await generateFeedbackForAnswer(
+    messageToSend,
+    lastAiQuestion
+  );
+
+  setChatMessages((prev) => {
+    const updated = [...prev];
+    const idx = updated.map((m) => m.sender).lastIndexOf("User");
+    if (idx !== -1) updated[idx].feedback = feedback;
+    return updated;
+  });
+
+  setChatMessages((prev) => [
+    ...prev,
+    {
+      sender: "AI",
+      text: aiReply,
+      time: new Date().toLocaleTimeString(),
+      stage: interviewStage,
+    },
+  ]);
+
+  textToSpeech(aiReply);
+}
+catch (err) {
       console.error("AI Error:", err);
       setError("AI failed to respond.");
     } finally {
@@ -1195,7 +1352,9 @@ Keep it concise and actionable.`;
 }, [isLoadingAI, isSpeaking, isRecording, handleSendMessage]);
 
 
-  const handleEndInterview = useCallback(async () => {
+  // Replace your existing handleEndInterview in InterviewScreen.jsx with this:
+
+const handleEndInterview = useCallback(async () => {
   if (isLoadingAI || isSpeaking) return;
 
   if (window.speechSynthesis.speaking) {
@@ -1224,6 +1383,7 @@ Keep it concise and actionable.`;
         content: reportText,
         role,
         companyType,
+        solvedProblems,
       }),
     });
 
@@ -1235,7 +1395,7 @@ Keep it concise and actionable.`;
 
     console.log("✅ Uploaded Report URL:", data.publicUrl);
 
-    // 2️⃣ Save to InterviewSession in DB
+    // 2️⃣ Save to InterviewSession in DB (with messages and solved problems)
     const sessionId = location.state?.sessionId;
 
     if (sessionId) {
@@ -1247,9 +1407,13 @@ Keep it concise and actionable.`;
           credentials: "include",
           body: JSON.stringify({
             reportUrl: data.publicUrl,
+            messages: chatMessages, // ✅ Send messages
+            solvedProblems: solvedProblems, // ✅ Send solved problems
           }),
         }
       );
+      
+      console.log("✅ Interview session updated with messages and solved problems");
     } else {
       console.warn("⚠️ No sessionId found. Interview not linked in DB.");
     }
@@ -1279,6 +1443,7 @@ Keep it concise and actionable.`;
   }
 }, [
   chatMessages,
+  solvedProblems, // ✅ Add to dependencies
   companyType,
   role,
   isLoadingAI,
@@ -1289,41 +1454,24 @@ Keep it concise and actionable.`;
 
 
   useEffect(() => {
-    const startCamera = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            frameRate: { ideal: 30 },
-            facingMode: "user"
-          },
-          audio: true,
-        });
-        setCameraAllowed(true);
-        if (userVideoRef.current) {
-          userVideoRef.current.srcObject = stream;
-          userVideoRef.current.playsInline = true;
-          await userVideoRef.current.play().catch((e) => console.log("Play error:", e));
-        }
-      } catch (error) {
-        setCameraAllowed(false);
-        console.error("Camera access denied:", error);
-        setError("Camera/Mic access denied. Please enable them to continue.");
-      }
-    };
-    startCamera();
+  if (isPreview) return;
 
-    return () => {
-      if (userVideoRef.current?.srcObject) {
-        const tracks = userVideoRef.current.srcObject.getTracks();
-        tracks.forEach(track => track.stop());
-      }
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-    };
-  }, []);
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+      setCameraAllowed(true);
+      userVideoRef.current.srcObject = stream;
+    } catch (err) {
+      setError("Camera/Mic access denied.");
+    }
+  };
+
+  startCamera();
+}, [isPreview]);
+
 
   // --- Remove any "auto-generate coding question before greeting" logic.
   // Editor will be opened only when AI asks a coding question and we fetch one canonical problem.
@@ -1392,332 +1540,354 @@ then begin with an appropriate first question (example: "Can you tell me about y
   }
 
   return (
-    <div
-      ref={screenRef}
-      className={`relative bg-gray-900 text-white flex flex-col justify-between overflow-hidden transition-all duration-300
-        ${isFullScreen ? "w-full h-full rounded-none mt-0" : "max-w-7xl mx-auto mt-4 rounded-xl shadow-xl h-[80vh]"}`}
-      style={{ background: "linear-gradient(135deg, #1f2937, #111827)" }}
-    >
-      <div className="flex justify-between items-center px-6 py-3 bg-gray-800 rounded-t-2xl flex-shrink-0">
-        <h2 className="text-lg font-light text-gray-200">
-          {companyType} — {role}
-        </h2>
-        <button onClick={toggleFullScreen} className="p-2 hover:bg-gray-700 rounded-full">
-          {isFullScreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-        </button>
-      </div>
+  <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-blue-100 p-6">
+    <div className="max-w-7xl mx-auto">
+      <div className="bg-white/40 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 p-8">
 
-      <div className="flex-grow flex items-center justify-center relative overflow-hidden">
-        <video
-          ref={userVideoRef}
-          autoPlay
-          playsInline
-          muted
-          className="w-full h-full object-contain transform scale-x-[-1] bg-black"
-        />
-        <p className="absolute bottom-4 left-6 bg-black bg-opacity-50 text-sm px-3 py-1 rounded-md z-10">
-          You
-        </p>
-
-        {error && (
-          <div className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white p-6 rounded-lg shadow-xl z-20 max-w-md
-              ${error.includes("✅ Report saved!") ? 'bg-green-600' :
-                error.includes("Analyzing the Interview") ? 'bg-yellow-600' :
-                  'bg-red-800'
-              }`}
-          >
-            <p className="font-semibold text-lg mb-2">
-              {error.includes("✅ Report saved!") ? 'Success' :
-                error.includes("Analyzing the Interview") ? 'Processing Report' :
-                  'Error'
-              }
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              {companyType} — {role}
+            </h1>
+            <p className="text-sm text-gray-600">
+              Live AI-powered mock interview
             </p>
-            <p className="text-sm">{error}</p>
-            {error.includes("❌") && (
-              <button
-                onClick={() => setError(null)}
-                className="mt-4 bg-white text-red-800 px-4 py-2 rounded hover:bg-gray-100 transition"
-              >
-                Dismiss
-              </button>
-            )}
           </div>
-        )}
 
-        {isSpeaking && (
-          <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-indigo-600 text-white px-4 py-2 rounded-full shadow-lg z-20 animate-pulse text-sm">
-            Interviewer is speaking...
-          </div>
-        )}
-
-        <div
-          className="absolute bottom-6 right-6 w-[250px] h-[200px] rounded-lg overflow-hidden border-2 border-white shadow-lg z-10"
-          style={{
-            backgroundImage: `url(/image.jpg)`,
-            backgroundSize: "cover",
-            backgroundRepeat: "no-repeat",
-            backgroundPosition: "center",
-          }}
-        >
-          <Canvas camera={{ position: [0, 0, 5] }}>
-            <ambientLight intensity={0.6} />
-            <Environment preset="studio" />
-            <DynamicModel
-              speechText={currentAiSpeech}
-              onSpeechEnd={handleSpeechEnd}
-            />
-          </Canvas>
-          <p className="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
-            AI Interviewer
-          </p>
+          <button
+            onClick={handleEndInterview}
+            className="px-5 py-2 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center gap-2"
+          >
+            <PhoneOff size={18} />
+            End Interview
+          </button>
         </div>
 
-        <div
-          className={`absolute top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl flex flex-col text-gray-800 z-20 transform transition-transform duration-300 ${
-            isChatOpen ? "translate-x-0" : "translate-x-full"
-          }`}
-        >
-          <div className="flex justify-between items-center px-6 py-4 border-b bg-gray-100 flex-shrink-0">
-            <h2 className="text-xl font-semibold text-gray-800">Conversation</h2>
-            <button onClick={() => setIsChatOpen(false)} className="p-1 hover:bg-gray-200 rounded-full">
-              <X className="w-6 h-6 text-gray-700" />
-            </button>
-          </div>
+        {/* Main Grid */}
+        <div className="grid grid-cols-3 gap-6">
 
-          <div className="flex-grow overflow-y-auto p-4 space-y-4">
-            {chatMessages.map((msg, idx) => (
-              <div key={idx}>
-                <div className={`flex ${msg.sender === "User" ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`p-3 rounded-xl max-w-[75%] shadow-md ${
-                      msg.sender === "User"
-                        ? "bg-indigo-500 text-white rounded-br-none"
-                        : "bg-gray-200 text-gray-800 rounded-tl-none"
-                    }`}
-                  >
-                    <span className="text-xs font-semibold opacity-80">{msg.sender}</span>
-                    <p className="text-sm mt-1">{msg.text}</p>
+          {/* Left: Main Video */}
+          <div className="col-span-2 relative">
+            <div className="rounded-2xl overflow-hidden shadow-lg bg-black h-[420px] relative">
+               <div className="absolute top-4 left-4 bg-indigo-200/80 backdrop-blur px-4 py-2 rounded-full flex items-center gap-2">
+                  <div className="w-8 h-8 bg-indigo-300 rounded-full flex items-center justify-center text-xs font-medium text-indigo-700">
+                    TS
                   </div>
+                  <span className="text-sm font-medium text-gray-800">Mrs. Tania Shahira</span>
                 </div>
-              </div>
-            ))}
-            {isLoadingAI && !error && (
-              <div className="text-gray-500 italic flex justify-start">
-                <div className="p-3 bg-gray-100 rounded-xl rounded-tl-none text-sm shadow-sm">Jenny is thinking…</div>
-              </div>
-            )}
-            <div ref={chatEndRef} />
-          </div>
-
-          <div className="p-4 border-t bg-gray-50 flex gap-2 flex-shrink-0">
-            <button
-              type="button"
-              onClick={startSpeechRecognition}
-              disabled={isLoadingAI || isSpeaking}
-              className={`p-3 rounded-xl transition ${
-                isRecording
-                  ? "bg-red-500 text-white shadow-red-500/50 shadow-lg animate-pulse"
-                  : "bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
-              }`}
-            >
-              <Mic className="w-5 h-5" />
-            </button>
-            <input
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Type or speak your response..."
-              className="flex-grow p-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500"
-              onKeyDown={(e) => e.key === "Enter" && handleSendMessage(inputValue)}
-              disabled={isLoadingAI || isSpeaking}
-            />
-            <button
-              onClick={() => handleSendMessage(inputValue)}
-              disabled={!inputValue.trim() || isLoadingAI || isSpeaking}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl transition disabled:opacity-50"
-            >
-              Send
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex justify-center gap-12 bg-gray-800 py-4 border-t border-gray-700 rounded-b-2xl flex-shrink-0">
-        <button
-  onClick={() => setShowSolvedProblems(true)}
-  className="flex flex-col items-center text-gray-300 hover:text-white transition"
->
-  <Code className="w-7 h-7 mb-1" />
-  <span className="text-xs font-medium">Solved</span>
-</button>
-
-        <button
-          onClick={handleEndInterview}
-          disabled={isLoadingAI || isSpeaking}
-          className="flex flex-col items-center text-red-500 hover:text-red-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <PhoneOff className="w-7 h-7 mb-1" />
-          <span className="text-xs font-medium">End Interview</span>
-        </button>
-        <button
-          onClick={() => setIsChatOpen(!isChatOpen)}
-          className={`flex flex-col items-center transition ${isChatOpen ? 'text-indigo-400' : 'text-gray-300 hover:text-white'}`}
-        >
-          <MessageSquare className="w-7 h-7 mb-1" />
-          <span className="text-xs font-medium">Chat</span>
-        </button>
-        <button
-          onClick={() => {
-            if (!codingProblem) {
-              setError("⚠️ No coding problem assigned yet!");
-              return;
-            }
-            setIsCodeEditorOpen(true);
-          }}
-          disabled={isLoadingAI}
-          className="flex flex-col items-center text-gray-300 hover:text-white transition disabled:opacity-50"
-        >
-          <Code className="w-7 h-7 mb-1" />
-          <span className="text-xs font-medium">Code Editor</span>
-        </button>
-      </div>
-
-      {isCodeEditorOpen && (
-        <CodeEditorModal
-  isOpen={isCodeEditorOpen}
-  onClose={() => setIsCodeEditorOpen(false)}
-  problem={codingProblem}
-
-  onSuccess={async (userCode, testResults) => {
-    // Save result
-    setSolvedProblems(prev => [
-      ...prev,
-      {
-        problem: codingProblem,
-        userCode,
-        testResults,
-        skipped: false,
-        solvedAt: new Date().toISOString()
-      }
-    ]);
-
-    setIsCodeEditorOpen(false);
-
-    // Increase coding counter
-    setCodingCount(prev => prev + 1);
-
-    // After increment, decide next step based on count
-    setTimeout(async () => {
-      const nextCount = codingCount + 1; // local snapshot
-      if (nextCount >= 3) {
-        // conclude coding round
-        setChatMessages(prev => [
-          ...prev,
-          {
-            sender: "AI",
-            text: "Great work! That concludes the coding round. We will now move to the next round.",
-            time: new Date().toLocaleTimeString(),
-            stage: "post-coding",
-          }
-        ]);
-
-        textToSpeech("Great work! That concludes the coding round. We will now move to the next round.");
-        setInterviewStage("final");
-        return;
-      }
-
-      // Otherwise → generate next coding problem
-      try {
-        const { problem: nextProblem } = await fetchAndFormatCodingProblem();
-        setCodingProblem(nextProblem);
-
-        setChatMessages(prev => [
-          ...prev,
-          {
-            sender: "AI",
-            text: "A new coding problem has been generated. Please open the Code Editor to solve it.",
-            time: new Date().toLocaleTimeString(),
-            stage: "coding",
-          }
-        ]);
-
-        setTimeout(() => setIsCodeEditorOpen(true), 500);
-      } catch (err) {
-        console.error("Failed to fetch next coding problem:", err);
-        setError("Failed to fetch next coding problem. Please try again.");
-      }
-    }, 300);
-  }}
-
-  onSkip={async (userCode) => {
-    setSolvedProblems(prev => [
-      ...prev,
-      {
-        problem: codingProblem,
-        userCode: null,
-        testResults: null,
-        skipped: true,
-        solvedAt: new Date().toISOString()
-      }
-    ]);
-
-    setIsCodeEditorOpen(false);
-
-    setCodingCount(prev => prev + 1);
-
-    setTimeout(async () => {
-      const nextCount = codingCount + 1;
-      if (nextCount >= 3) {
-        setChatMessages(prev => [
-          ...prev,
-          {
-            sender: "AI",
-            text: "That concludes the coding round. Let's move to the next round.",
-            time: new Date().toLocaleTimeString(),
-            stage: "post-coding",
-          }
-        ]);
-
-        textToSpeech("That concludes the coding round. Let's move to the next round.");
-        setInterviewStage("final");
-        return;
-      }
-
-      try {
-        const { problem: nextProblem } = await fetchAndFormatCodingProblem();
-        setCodingProblem(nextProblem);
-
-        setChatMessages(prev => [
-          ...prev,
-          {
-            sender: "AI",
-            text: "A new coding problem has been generated. Please open the Code Editor to solve it.",
-            time: new Date().toLocaleTimeString(),
-            stage: "coding",
-          }
-        ]);
-
-        setTimeout(() => setIsCodeEditorOpen(true), 500);
-      } catch (err) {
-        console.error("Failed to fetch next coding problem:", err);
-        setError("Failed to fetch next coding problem. Please try again.");
-      }
-    }, 300);
-  }}
-/>
-
-      )}
-
-      {showSolvedProblems && (
-  <SolvedProblemsModal
-    isOpen={showSolvedProblems}
-    onClose={() => setShowSolvedProblems(false)}
-    problems={solvedProblems}
+              {isPreview ? (
+  <div className="w-full h-full bg-black flex items-center justify-center text-gray-400">
+    Video disabled in preview
+  </div>
+) : (
+  <video
+    ref={userVideoRef}
+    autoPlay
+    playsInline
+    muted
+    className="w-full h-full object-cover scale-x-[-1]"
   />
 )}
 
+
+              {/* AI Speaking Indicator */}
+              {isSpeaking && (
+                <div className="absolute top-4 left-4 bg-indigo-600 text-white px-4 py-1 rounded-full text-sm animate-pulse">
+                  Jenny is speaking…
+                </div>
+              )}
+
+              
+
+              {/* Control Bar */}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-4">
+
+  {/* Mic */}
+  <button
+    onClick={startSpeechRecognition}
+    className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg ${
+      isRecording ? "bg-red-500" : "bg-white"
+    }`}
+  >
+    <Mic className={isRecording ? "text-white" : "text-gray-700"} />
+  </button>
+
+  {/* Chat */}
+  <button
+    onClick={() => setIsChatOpen(true)}
+    className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-lg"
+  >
+    <MessageSquare className="text-gray-700" />
+  </button>
+
+  {/* Code Editor */}
+  <button
+    onClick={() => setIsCodeEditorOpen(true)}
+    className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-lg"
+  >
+    <Code className="text-gray-700" />
+  </button>
+
+  {/* Solved Problems */}
+  {solvedProblems.length > 0 && (
+    <button
+      onClick={() => setShowSolvedProblems(true)}
+      className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-lg hover:bg-indigo-50 transition"
+      title="View Solved Problems"
+    >
+      <ListChecks className="text-indigo-600" />
+    </button>
+  )}
+</div>
+
+            </div>
+
+            {/* Notes */}
+            <div className="mt-6 bg-white/50 backdrop-blur rounded-xl p-5">
+              <h3 className="font-semibold text-gray-900 mb-2">
+                Interview Progress
+              </h3>
+              <p className="text-sm text-gray-600">
+                Current Stage: <strong>{interviewStage}</strong>
+              </p>
+            </div>
+          </div>
+
+          {/* Right Sidebar */}
+          <div className="space-y-4">
+
+            {/* AI Video */}
+            <div className="relative rounded-xl overflow-hidden shadow-lg h-48 bg-black">
+              <Canvas camera={{ position: [0, 0, 5] }}>
+                <ambientLight intensity={0.6} />
+                <Environment preset="studio" />
+                <DynamicModel
+                  speechText={currentAiSpeech}
+                  onSpeechEnd={handleSpeechEnd}
+                />
+              </Canvas>
+
+             <div className="absolute bottom-4 left-4 bg-indigo-200/80 backdrop-blur px-4 py-2 rounded-full flex items-center gap-2 shadow-md">
+  <span className="text-sm font-medium text-gray-800">
+    Ms. Jenny
+  </span>
+</div>
+
+            </div>
+
+            {/* Question List */}
+            <div className="bg-white/50 backdrop-blur rounded-xl p-4 flex flex-col h-[360px]">
+
+  {/* Messages (SCROLLABLE) */}
+  <div className="flex-1 overflow-y-auto pr-2">
+    <h4 className="font-semibold text-gray-900 mb-3">
+      Conversation
+    </h4>
+
+    {chatMessages.map((msg, idx) => (
+      <div
+        key={idx}
+        className={`mb-3 text-sm ${
+          msg.sender === "User"
+            ? "text-right text-indigo-700"
+            : "text-left text-gray-800"
+        }`}
+      >
+        <p className="inline-block px-3 py-2 rounded-lg bg-white shadow">
+          {msg.text}
+        </p>
+      </div>
+    ))}
+
+    {isLoadingAI && (
+      <p className="text-sm text-gray-500 italic">
+        Jenny is thinking…
+      </p>
+    )}
+  </div>
+
+  {/* INPUT BAR (FIXED, ALWAYS VISIBLE) */}
+  <div className="mt-3 pt-3 border-t border-gray-200 flex items-center gap-2">
+    <input
+      type="text"
+      value={inputValue}
+      onChange={(e) => setInputValue(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && inputValue.trim()) {
+          handleSendMessage(inputValue);
+        }
+      }}
+      placeholder="Type your answer here (testing)…"
+      className="flex-1 px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+    />
+
+    <button
+      onClick={() => handleSendMessage(inputValue)}
+      disabled={!inputValue.trim() || isLoadingAI || isSpeaking}
+      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm disabled:opacity-50"
+    >
+      Send
+    </button>
+  </div>
+</div>
+
+          </div>
+        </div>
+
+        {/* Modals */}
+        {isCodeEditorOpen && (
+  <CodeEditorModal
+    isOpen={isCodeEditorOpen}
+    onClose={() => setIsCodeEditorOpen(false)}
+    problem={codingProblem}
+
+    onSuccess={async (userCode, testResults) => {
+      // Save solved problem
+      setSolvedProblems((prev) => [
+        ...prev,
+        {
+          problem: codingProblem,
+          userCode,
+          testResults,
+          skipped: false,
+          solvedAt: new Date().toISOString(),
+        },
+      ]);
+
+      setIsCodeEditorOpen(false);
+
+      // Increase coding count
+      setCodingCount((prev) => prev + 1);
+
+      setTimeout(async () => {
+        const nextCount = codingCount + 1;
+
+        // If 3 problems completed → end coding round
+        if (nextCount >= 3) {
+          const msg =
+            "Great work! That concludes the coding round. We will now move to the next round.";
+
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              sender: "AI",
+              text: msg,
+              time: new Date().toLocaleTimeString(),
+              stage: "post-coding",
+            },
+          ]);
+
+          textToSpeech(msg);
+          setInterviewStage("final");
+          return;
+        }
+
+        // Otherwise fetch next problem
+        try {
+          const { problem: nextProblem } =
+            await fetchAndFormatCodingProblem();
+
+          setCodingProblem(nextProblem);
+
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              sender: "AI",
+              text:
+                "A new coding problem has been generated. Please open the Code Editor to solve it.",
+              time: new Date().toLocaleTimeString(),
+              stage: "coding",
+            },
+          ]);
+
+          setTimeout(() => setIsCodeEditorOpen(true), 500);
+        } catch (err) {
+          console.error(err);
+          setError("Failed to fetch next coding problem.");
+        }
+      }, 300);
+    }}
+
+    onSkip={async () => {
+      // Save skipped problem
+      setSolvedProblems((prev) => [
+        ...prev,
+        {
+          problem: codingProblem,
+          userCode: null,
+          testResults: null,
+          skipped: true,
+          solvedAt: new Date().toISOString(),
+        },
+      ]);
+
+      setIsCodeEditorOpen(false);
+
+      setCodingCount((prev) => prev + 1);
+
+      setTimeout(async () => {
+        const nextCount = codingCount + 1;
+
+        if (nextCount >= 3) {
+          const msg =
+            "That concludes the coding round. Let's move to the next round.";
+
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              sender: "AI",
+              text: msg,
+              time: new Date().toLocaleTimeString(),
+              stage: "post-coding",
+            },
+          ]);
+
+          textToSpeech(msg);
+          setInterviewStage("final");
+          return;
+        }
+
+        try {
+          const { problem: nextProblem } =
+            await fetchAndFormatCodingProblem();
+
+          setCodingProblem(nextProblem);
+
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              sender: "AI",
+              text:
+                "A new coding problem has been generated. Please open the Code Editor to solve it.",
+              time: new Date().toLocaleTimeString(),
+              stage: "coding",
+            },
+          ]);
+
+          setTimeout(() => setIsCodeEditorOpen(true), 500);
+        } catch (err) {
+          console.error(err);
+          setError("Failed to fetch next coding problem.");
+        }
+      }, 300);
+    }}
+  />
+)}
+
+
+        {showSolvedProblems && (
+          <SolvedProblemsModal
+            isOpen={showSolvedProblems}
+            onClose={() => setShowSolvedProblems(false)}
+            problems={solvedProblems}
+          />
+        )}
+      </div>
     </div>
-  );
+  </div>
+);
+
 };
 
 export default InterviewScreen;

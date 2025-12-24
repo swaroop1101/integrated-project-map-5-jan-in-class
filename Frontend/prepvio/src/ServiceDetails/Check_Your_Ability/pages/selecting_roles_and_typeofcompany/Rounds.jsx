@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { ArrowLeft, PlayCircle } from "lucide-react";
 
 const Rounds = ({ companyType, role }) => {
   const [rounds, setRounds] = useState([]);
@@ -27,88 +28,104 @@ const Rounds = ({ companyType, role }) => {
   }, [companyType, role]);
 
   const handleStartInterview = async () => {
-  try {
-    // Camera permission check
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    stream.getTracks().forEach(track => track.stop());
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      stream.getTracks().forEach((track) => track.stop());
 
-    // 🔴 Create interview session in backend
-    const res = await axios.post(
-      "http://localhost:5000/api/interview-session/start",
-      {
-        companyType,
-        role,
-      },
-      { withCredentials: true }
-    );
+      const res = await axios.post(
+        "http://localhost:5000/api/interview-session/start",
+        { companyType, role },
+        { withCredentials: true }
+      );
 
-    const sessionId = res.data.sessionId;
+      const sessionId = res.data.sessionId;
 
-    // Navigate with sessionId
-    navigate("/services/check-your-ability/interview", {
-      state: {
-        companyType,
-        role,
-        rounds,
-        sessionId,
-        preventBack: true,
-      },
-      replace: true,
-    });
+      navigate("/services/check-your-ability/interview", {
+        state: {
+          companyType,
+          role,
+          rounds,
+          sessionId,
+          preventBack: true,
+        },
+        replace: true,
+      });
+    } catch (error) {
+      console.error(error);
+      alert("⚠️ Please allow camera access or login again.");
+    }
+  };
 
-  } catch (error) {
-    console.error(error);
-    alert("⚠️ Please allow camera access or login again.");
-  }
-};
-
-
-  if (loading)
+  if (loading) {
     return (
-      <div className="text-center text-gray-600 mt-10 text-lg">
-        Loading rounds...
+      <div className="min-h-screen flex items-center justify-center text-gray-600 text-lg">
+        Loading interview rounds…
       </div>
     );
+  }
 
   return (
-    <div className="p-8 sm:p-12 space-y-8 max-w-xl mx-auto flex flex-col items-center bg-white shadow-xl rounded-xl">
-      <h2 className="text-2xl sm:text-3xl text-gray-800 font-light tracking-wider text-center">
-        Interview Rounds
-      </h2>
-      <p className="text-gray-600 text-center text-lg mt-0 font-light max-w-sm">
-        Rounds for{" "}
-        <span className="font-semibold text-indigo-600">{companyType}</span>{" "}
-        <br />
-        and selected Role is{" "}
-        <span className="font-semibold text-indigo-600">{role}</span>
-      </p>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-blue-100 p-6 flex items-center justify-center">
+      <div className="w-full max-w-3xl bg-white/40 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 p-10 space-y-10">
 
-      <div className="w-full text-left space-y-3 p-4 border rounded-lg bg-gray-50">
-        {rounds.length > 0 ? (
-          rounds.map((round, index) => (
-            <p key={index} className="text-gray-800 font-normal">
-              <span className="font-bold text-indigo-700">{round.name}:</span>{" "}
-              {round.description}
+        {/* Header */}
+        <div className="text-center space-y-2">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Interview Rounds
+          </h1>
+          <p className="text-gray-600 text-base">
+            Practice interview for{" "}
+            <span className="font-semibold text-indigo-600">
+              {companyType}
+            </span>{" "}
+            —{" "}
+            <span className="font-semibold text-indigo-600">
+              {role}
+            </span>
+          </p>
+        </div>
+
+        {/* Rounds List */}
+        <div className="space-y-4">
+          {rounds.length > 0 ? (
+            rounds.map((round, index) => (
+              <div
+                key={index}
+                className="bg-white/60 backdrop-blur-lg border border-white/50 rounded-xl p-5 shadow hover:shadow-lg transition"
+              >
+                <h3 className="text-lg font-semibold text-indigo-700 mb-1">
+                  {round.name}
+                </h3>
+                <p className="text-gray-700 text-sm leading-relaxed">
+                  {round.description}
+                </p>
+              </div>
+            ))
+          ) : (
+            <p className="text-center text-gray-500 italic">
+              No rounds configured for this role.
             </p>
-          ))
-        ) : (
-          <p className="text-gray-500 italic">No rounds found for this role.</p>
-        )}
-      </div>
+          )}
+        </div>
 
-      <div className="flex justify-center space-x-4 mt-8 w-full">
-        <button
-          onClick={() => navigate(-1)}
-          className="py-3 px-6 text-base font-normal rounded-full transition-all duration-300 border-2 border-gray-400 text-gray-700 bg-white hover:bg-gray-100"
-        >
-          &larr; Change Selection
-        </button>
-        <button
-          onClick={handleStartInterview}
-          className="py-3 px-8 text-lg font-normal rounded-full transition-all duration-300 border-2 border-indigo-700 bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 hover:scale-[1.03]"
-        >
-          Start Practice Interview
-        </button>
+        {/* Actions */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-between pt-6 border-t border-white/50">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-gray-400 text-gray-700 bg-white hover:bg-gray-100 transition"
+          >
+            <ArrowLeft size={18} />
+            Change Selection
+          </button>
+
+          <button
+            onClick={handleStartInterview}
+            className="flex items-center justify-center gap-2 px-8 py-3 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg hover:scale-[1.03] transition"
+          >
+            <PlayCircle size={20} />
+            Start Practice Interview
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -3,8 +3,8 @@ import { Check } from "lucide-react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
+/* ---------------- Selection Button (LOGIC UNCHANGED) ---------------- */
 
-// --- Reusable Component: SelectionButton ---
 const SelectionButton = ({
   value,
   options,
@@ -17,7 +17,6 @@ const SelectionButton = ({
   const [roleWarning, setRoleWarning] = useState(false);
   const ref = useRef();
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (ref.current && !ref.current.contains(event.target)) {
@@ -31,8 +30,10 @@ const SelectionButton = ({
   const displayValue = value || placeholder;
 
   return (
-    <div className={`relative w-96 max-w-full overflow-visible ${className}`} ref={ref}>
-      {/* Main Button */}
+    <div
+      className={`relative w-full max-w-md ${className}`}
+      ref={ref}
+    >
       <button
         onClick={() => {
           if (!disabled) {
@@ -42,27 +43,23 @@ const SelectionButton = ({
             setTimeout(() => setRoleWarning(false), 3000);
           }
         }}
+        disabled={disabled}
         className={`
-          w-full p-3 text-center border-2 shadow-md transition-all duration-200 rounded-lg
+          w-full px-5 py-4 rounded-xl text-left border transition
           ${
             disabled
               ? "bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed"
-              : "bg-white text-gray-700 border-gray-400 hover:bg-gray-50"
+              : "bg-white/70 backdrop-blur text-gray-800 border-gray-300 hover:bg-white"
           }
         `}
-        disabled={disabled}
       >
-        <span className={`${!value && "text-gray-500"}`}>{displayValue}</span>
+        <span className={!value ? "text-gray-400" : ""}>
+          {displayValue}
+        </span>
       </button>
 
-      {/* Dropdown Menu */}
       {isOpen && options.length > 0 && (
-        <div
-          className="
-            absolute z-[9999] w-full mt-1 bg-white border border-gray-300 shadow-xl 
-            max-h-60 overflow-y-auto rounded-lg animate-fadeIn
-          "
-        >
+        <div className="absolute z-50 w-full mt-2 bg-white rounded-xl shadow-xl border border-gray-200 max-h-64 overflow-y-auto">
           {options.map((option) => (
             <div
               key={option}
@@ -71,22 +68,21 @@ const SelectionButton = ({
                 onSelect(option);
                 setIsOpen(false);
               }}
-              className={`
-                p-3 text-gray-800 cursor-pointer hover:bg-indigo-50 
-                flex items-center justify-between
+              className={`px-5 py-3 cursor-pointer flex justify-between items-center hover:bg-indigo-50
                 ${value === option ? "bg-indigo-100 font-semibold" : ""}
               `}
             >
               {option}
-              {value === option && <Check className="w-4 h-4 text-indigo-600" />}
+              {value === option && (
+                <Check className="w-4 h-4 text-indigo-600" />
+              )}
             </div>
           ))}
         </div>
       )}
 
-      {/* Warning Message */}
       {roleWarning && disabled && (
-        <p className="text-red-500 text-sm text-center mt-2 transition-opacity duration-300">
+        <p className="text-sm text-red-500 text-center mt-2">
           Please select a Company Type first.
         </p>
       )}
@@ -94,7 +90,8 @@ const SelectionButton = ({
   );
 };
 
-// --- Main Component: SelectRolesAndCompany ---
+/* ---------------- Main Page ---------------- */
+
 const SelectRolesAndCompany = ({
   companyType,
   setCompanyType,
@@ -103,16 +100,13 @@ const SelectRolesAndCompany = ({
 }) => {
   const [companies, setCompanies] = useState([]);
   const [roles, setRoles] = useState([]);
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
 
-  // ✅ Fetch all companies on mount
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
         const res = await axios.get("http://localhost:5000/api/companies");
-        if (Array.isArray(res.data)) {
-          setCompanies(res.data);
-        }
+        if (Array.isArray(res.data)) setCompanies(res.data);
       } catch (error) {
         console.error("Error fetching companies:", error);
       }
@@ -120,7 +114,6 @@ const SelectRolesAndCompany = ({
     fetchCompanies();
   }, []);
 
-  // ✅ Fetch roles of selected company
   useEffect(() => {
     const fetchRoles = async () => {
       if (!companyType) {
@@ -130,16 +123,13 @@ const SelectRolesAndCompany = ({
 
       try {
         const res = await axios.get(
-          `http://localhost:5000/api/companies/roles/${encodeURIComponent(companyType)}`
+          `http://localhost:5000/api/companies/roles/${encodeURIComponent(
+            companyType
+          )}`
         );
 
         if (Array.isArray(res.data)) {
-          const roleNames = res.data.map((r) =>
-            typeof r === "string" ? r : r.name
-          );
-          setRoles(roleNames);
-        } else {
-          setRoles([]);
+          setRoles(res.data.map((r) => (typeof r === "string" ? r : r.name)));
         }
       } catch (error) {
         console.error("Error fetching roles:", error);
@@ -161,54 +151,60 @@ const SelectRolesAndCompany = ({
 
   const handleStartInterview = () => {
     if (companyType && role) {
-      // ✅ Navigate to the rounds page with correct path
       navigate("/services/check-your-ability/rounds");
     }
   };
 
   return (
-    <div className="p-8 sm:p-12 space-y-8 max-w-xl mx-auto flex flex-col items-center bg-white shadow-xl rounded-xl">
-      <h2 className="text-2xl sm:text-3xl text-gray-800 font-light tracking-wider">
-        Check Your Ability
-      </h2>
-      <p className="text-gray-600 text-center text-lg mt-0 mb-8 font-light">
-        Select preferred company type & Role below
-      </p>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-blue-100 flex items-center justify-center p-6">
+      <div className="w-full max-w-2xl bg-white/40 backdrop-blur-xl border border-white/50 rounded-2xl shadow-2xl p-10 space-y-10">
 
-      <div className="space-y-4 w-full flex flex-col items-center">
-        {/* Company Dropdown */}
-        <SelectionButton
-          placeholder="Select Your Company Type"
-          value={companyType}
-          options={companies}
-          onSelect={handleCompanySelect}
-        />
+        {/* Header */}
+        <div className="text-center space-y-2">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Check Your Ability
+          </h1>
+          <p className="text-gray-600 text-base">
+            Choose a company type and role to begin your mock interview
+          </p>
+        </div>
 
-        {/* Role Dropdown */}
-        <SelectionButton
-          placeholder="Select Your Role"
-          value={role}
-          options={roles}
-          onSelect={handleRoleSelect}
-          disabled={!companyType}
-        />
+        {/* Selectors */}
+        <div className="flex flex-col items-center gap-6">
+          <SelectionButton
+            placeholder="Select Company Type"
+            value={companyType}
+            options={companies}
+            onSelect={handleCompanySelect}
+          />
+
+          <SelectionButton
+            placeholder="Select Role"
+            value={role}
+            options={roles}
+            onSelect={handleRoleSelect}
+            disabled={!companyType}
+          />
+        </div>
+
+        {/* CTA */}
+        <div className="pt-6 border-t border-white/50 flex justify-center">
+          <button
+            onClick={handleStartInterview}
+            disabled={!companyType || !role}
+            className={`
+              px-10 py-4 rounded-full text-lg transition
+              ${
+                companyType && role
+                  ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg hover:scale-[1.03]"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+              }
+            `}
+          >
+            Start Your Interview
+          </button>
+        </div>
       </div>
-
-      {/* Start Button */}
-      <button
-        onClick={handleStartInterview}
-        className={`
-          mt-12 py-3 px-8 text-lg font-normal rounded-full transition-all duration-300 border-2
-          ${
-            companyType && role
-              ? "bg-indigo-600 text-white border-indigo-700 shadow-lg hover:bg-indigo-700 hover:scale-[1.03]"
-              : "bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed"
-          }
-        `}
-        disabled={!companyType || !role}
-      >
-        Click To Start Your Interview
-      </button>
     </div>
   );
 };
