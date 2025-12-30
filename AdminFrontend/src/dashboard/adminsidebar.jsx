@@ -434,7 +434,7 @@ export default function Sidebar() {
         {/* Logo Section */}
         <div className="flex justify-center items-center mb-10 bg-white/60 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-white/50">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-            MERN-Admin
+            PrepVio Admin Dashboard
           </h1>
         </div>
 

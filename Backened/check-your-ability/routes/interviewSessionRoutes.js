@@ -140,6 +140,72 @@ router.delete("/:id", verifyToken, async (req, res) => {
   }
 });
 
+// ✅ ADMIN: get all interview sessions for a user
+router.get("/admin/user/:userId", async (req, res) => {
+  try {
+    const sessions = await InterviewSession.find({
+      userId: req.params.userId
+    })
+      .sort({ startedAt: -1 })
+      .select(
+        "companyType role status startedAt completedAt reportUrl messages solvedProblems highlightClips"
+      )
+      .lean();
+
+    res.json({
+      success: true,
+      interviews: sessions
+    });
+  } catch (err) {
+    console.error("Admin interview fetch error:", err);
+    res.status(500).json({ message: "Failed to fetch interviews" });
+  }
+});
+
+// ✅ ADMIN: GLOBAL INTERVIEW STATS
+router.get("/admin/stats", async (req, res) => {
+  try {
+    const sessions = await InterviewSession.find({}).select(
+      "status companyType messages solvedProblems highlightClips"
+    );
+
+    const stats = {
+      total: sessions.length,
+      completed: 0,
+      inProgress: 0,
+      startup: 0,
+      service: 0,
+      product: 0,
+
+      // 🔥 NEW GLOBAL COUNTS
+      totalMessages: 0,
+      totalProblems: 0,
+      totalClips: 0,
+    };
+
+    sessions.forEach(s => {
+      // status
+      if (s.status === "completed") stats.completed++;
+      else stats.inProgress++;
+
+      // company type
+      const type = s.companyType?.toLowerCase();
+      if (type === "startup") stats.startup++;
+      if (type === "service") stats.service++;
+      if (type === "product") stats.product++;
+
+      // 🔥 NEW AGGREGATES
+      stats.totalMessages += s.messages?.length || 0;
+      stats.totalProblems += s.solvedProblems?.length || 0;
+      stats.totalClips += s.highlightClips?.length || 0;
+    });
+
+    res.json({ success: true, stats });
+  } catch (err) {
+    console.error("Interview stats error:", err);
+    res.status(500).json({ message: "Failed to fetch interview stats" });
+  }
+});
 
 
 export default router;
