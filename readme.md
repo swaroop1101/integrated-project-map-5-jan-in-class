@@ -102,4 +102,4 @@ npm install
 AdminBackend      →   npm run dev   (Port 5000)
 AdminFrontend     →   npm run dev   (Port 5174)
 frontend/prepvio  →   npm run dev   (Port 5173)
-Backened          →   npm run dev   (Port 8000)
+Backened          →   npx nodemon server.js   (Port 8000)
