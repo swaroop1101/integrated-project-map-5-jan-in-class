@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, Outlet } from "react-router-dom";
 
 import Home from "./HomePages/Home.jsx";
 import Layout from "./components/Layout.jsx";
@@ -38,6 +38,8 @@ import Aptitude from "./ServiceDetails/Check_Your_Ability/pages/Aptitude/Aptitud
 import Feedback from "./Dashboard/Feedback.jsx";
 import AptitudeReviewMode from "./Dashboard/AptitudeReviewMode.jsx";
 
+import RazorpayTest from "./pricing/RazorpayTest.jsx";
+
 import ScrollToTop from "./ScrollToTop.jsx";
 import LoadingSpinner from "./components/LoadingSpinner.jsx";
 
@@ -65,6 +67,29 @@ const ProtectedRoute = ({ children }) => {
 
 	return children;
 };
+
+const PaidOnlyRoute = () => {
+  const { isAuthenticated, user } = useAuthStore();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!user) {
+    return <LoadingSpinner />;
+  }
+
+  if (!user.isVerified) {
+    return <Navigate to="/verify-email" replace />;
+  }
+
+  if (user.subscription?.planId === "free") {
+    return <Navigate to="/dashboard/payroll" replace />;
+  }
+
+  return <Outlet />;
+};
+
 
 /* ======================================================
    REDIRECT AUTHENTICATED USERS
@@ -163,49 +188,54 @@ function App() {
 				<Route path="/:channelName/:channelId/:courseId" element={<VideoPlayer />} />
 
 				{/* Check Your Ability Flow */}
-				<Route path="/services/check-your-ability">
-					{/* Step 1: Category selection */}
-					<Route index element={<Categories />} />
+				{/* Check Your Ability Flow */}
+<Route path="/services/check-your-ability">
+  
+  {/* ✅ Categories – always visible */}
+  <Route index element={<Categories />} />
 
-					<Route
-						path="/services/check-your-ability/aptitude"
-						element={<Aptitude />}
-					/>
+  {/* ✅ Aptitude – free & paid */}
+  <Route path="aptitude" element={<Aptitude />} />
+
+  {/* 🔒 Interview – PAID ONLY */}
+  <Route element={<PaidOnlyRoute />}>
+    
+    <Route
+      path="interview"
+      element={
+        <SelectRolesAndCompany
+          companyType={companyType}
+          setCompanyType={setCompanyType}
+          role={role}
+          setRole={setRole}
+        />
+      }
+    />
+
+    <Route
+      path="interview/rounds"
+      element={<Rounds companyType={companyType} role={role} />}
+    />
+
+    <Route
+      path="interview/start"
+      element={<InterviewScreen companyType={companyType} role={role} />}
+    />
+
+    <Route
+      path="interview/after-interview"
+      element={<AfterInterview />}
+    />
+
+  </Route>
+</Route>
 
 
-					{/* Step 2: Interview → Select company & role */}
-					<Route
-						path="interview"
-						element={
-							<SelectRolesAndCompany
-								companyType={companyType}
-								setCompanyType={setCompanyType}
-								role={role}
-								setRole={setRole}
-							/>
-						}
-					/>
-
-					{/* Step 3: Select rounds */}
-					<Route
-						path="interview/rounds"
-						element={<Rounds companyType={companyType} role={role} />}
-					/>
-
-					{/* Step 4: Interview screen */}
-					<Route
-						path="interview/start"
-						element={<InterviewScreen companyType={companyType} role={role} />}
-					/>
-
-					{/* Step 5: After interview */}
-					<Route path="interview/after-interview" element={<AfterInterview />} />
-				</Route>
 
 
 				{/* Catch-all */}
 				<Route path='*' element={<Navigate to='/' replace />} />
-
+				<Route path="/razorpay-test" element={<RazorpayTest />} />
 			</Routes>
 
 			<Footer />

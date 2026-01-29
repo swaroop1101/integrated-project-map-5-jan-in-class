@@ -19,6 +19,8 @@ import Authroute from "./Routes/Authroute.js";
 import interviewSessionRoutes from "./check-your-ability/routes/interviewSessionRoutes.js";
 import userRoutes from "./Routes/userRoutes.js";
 
+import verifyPayment from './Routes/paymentRoute.js'
+
 const nervousCaptures = new Map();
 import fs from "fs";
 
@@ -41,7 +43,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use("/api/interview-session", interviewSessionRoutes);
 app.use(passport.initialize());
-
+app.use('/api/payment', verifyPayment)
 
 
 

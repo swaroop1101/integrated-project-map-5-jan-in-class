@@ -6,10 +6,8 @@ import mongoose from "mongoose";
 const videoProgressSchema = new mongoose.Schema(
   {
     videoId: { type: String, required: true },
-
     watchedSeconds: { type: Number, default: 0 },
     durationSeconds: { type: Number, default: 0 },
-
     completed: { type: Boolean, default: false },
     updatedAt: { type: Date, default: Date.now },
   },
@@ -24,22 +22,21 @@ const courseProgressSchema = new mongoose.Schema(
     courseId: { type: String, required: true },
     courseTitle: { type: String, required: true },
     courseThumbnail: String,
-
     channelId: { type: String, required: true },
     channelName: { type: String, required: true },
     channelThumbnail: String,
-
     totalSeconds: { type: Number, required: true },
     watchedSeconds: { type: Number, default: 0 },
-
     startedAt: { type: Date, default: Date.now },
     lastAccessed: { type: Date, default: Date.now },
-
     videos: [videoProgressSchema],
   },
   { _id: false }
 );
 
+/* ======================================================
+   FEEDBACK SCHEMA
+====================================================== */
 const feedbackSchema = new mongoose.Schema(
   {
     userId: {
@@ -47,30 +44,23 @@ const feedbackSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-
-    // Context
     courseId: { type: String },
     channelId: { type: String },
-
-    // Type
     type: {
       type: String,
       enum: ["course", "general"],
       required: true,
     },
-
     category: {
       type: String,
       enum: ["content", "bug", "ui", "general"],
       required: true,
     },
-
     rating: {
       type: Number,
       min: 1,
       max: 5,
     },
-
     message: {
       type: String,
       required: true,
@@ -89,40 +79,32 @@ const aptitudeAttemptSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-
     totalQuestions: {
       type: Number,
       required: true,
     },
-
     correctAnswers: {
       type: Number,
       required: true,
     },
-
     percentage: {
       type: Number,
       required: true,
     },
-
     timeTakenSeconds: {
       type: Number,
       required: true,
     },
-
     answers: [
       {
         questionId: {
           type: String,
           required: true,
         },
-
-        // 🔽 SNAPSHOT (THIS IS THE KEY)
         question: {
           type: String,
           required: true,
         },
-
         options: [
           {
             text: {
@@ -131,27 +113,22 @@ const aptitudeAttemptSchema = new mongoose.Schema(
             },
           },
         ],
-
         explanation: {
           type: String,
         },
-
         difficulty: {
           type: String,
           enum: ["easy", "medium", "hard"],
           default: "medium",
         },
-
         selectedIndex: {
           type: Number,
           required: true,
         },
-
         correctIndex: {
           type: Number,
           required: true,
         },
-
         isCorrect: {
           type: Boolean,
           required: true,
@@ -162,7 +139,130 @@ const aptitudeAttemptSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+/* ======================================================
+   INTERVIEW ATTEMPT SCHEMA
+====================================================== */
+const interviewAttemptSchema = new mongoose.Schema(
+  {
+    role: {
+      type: String,
+      required: true,
+    },
+    difficulty: {
+      type: String,
+      enum: ["easy", "medium", "hard"],
+      default: "medium",
+    },
+    score: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+    feedback: {
+      type: String,
+    },
+    durationMinutes: {
+      type: Number,
+    },
+  },
+  { timestamps: true }
+);
 
+/* ======================================================
+   PAYMENT SCHEMA
+====================================================== */
+const paymentSchema = new mongoose.Schema(
+  {
+    productType: {
+      type: String,
+      enum: ["subscription", "course", "certificate", "interviews"],
+      default: "subscription",
+    },
+    amount: {
+      type: Number,
+      required: true,
+    },
+    provider: {
+      type: String,
+      enum: ["razorpay", "stripe", "paypal"],
+      default: "razorpay",
+    },
+    orderId: {
+      type: String,
+      required: true,
+    },
+    paymentId: {
+      type: String,
+    },
+    signature: {
+      type: String,
+    },
+    status: {
+      type: String,
+      enum: ["pending", "success", "failed", "refunded"],
+      default: "pending",
+    },
+    paidAt: {
+      type: Date,
+    },
+    planId: {
+      type: String,
+    },
+    // 👇 NEW: Interviews granted with this payment
+    interviewsGranted: {
+      type: Number,
+      default: 0,
+    },
+  },
+  { timestamps: true }
+);
+
+/* ======================================================
+   SUBSCRIPTION SCHEMA (WITH INTERVIEWS)
+====================================================== */
+const subscriptionSchema = new mongoose.Schema(
+  {
+    active: {
+      type: Boolean,
+      default: false,
+    },
+    planId: {
+      type: String,
+      enum: ["free", "monthly", "yearly", "lifetime"],
+      default: "free",
+    },
+    planName: {
+      type: String,
+    },
+    startDate: {
+      type: Date,
+    },
+    endDate: {
+      type: Date,
+    },
+    autoRenew: {
+      type: Boolean,
+      default: false,
+    },
+    cancelledAt: {
+      type: Date,
+    },
+    // 👇 NEW: Interview credits
+    interviewsTotal: {
+      type: Number,
+      default: 0,
+    },
+    interviewsUsed: {
+      type: Number,
+      default: 0,
+    },
+    interviewsRemaining: {
+      type: Number,
+      default: 0,
+    },
+  },
+  { _id: false }
+);
 
 /* ======================================================
    USER SCHEMA (SOURCE OF TRUTH)
@@ -171,9 +271,9 @@ const userSchema = new mongoose.Schema(
   {
     /* ================= AUTH ================= */
     name: {
-  type: String,
-  trim: true,
-},
+      type: String,
+      trim: true,
+    },
 
     email: {
       type: String,
@@ -195,14 +295,14 @@ const userSchema = new mongoose.Schema(
     },
 
     authProvider: {
-  type: String,
-  enum: ["local", "google"],
-  default: "local",
-},
+      type: String,
+      enum: ["local", "google"],
+      default: "local",
+    },
 
-googleId: {
-  type: String,
-},
+    googleId: {
+      type: String,
+    },
 
     verificationToken: {
       type: String,
@@ -225,6 +325,23 @@ googleId: {
       default: Date.now,
     },
 
+    /* ================= PAYMENT & SUBSCRIPTION ================= */
+    payments: [paymentSchema],
+
+    subscription: {
+      type: subscriptionSchema,
+      default: () => ({
+        active: false,
+        planId: "free",
+        interviewsTotal: 0,
+        interviewsUsed: 0,
+        interviewsRemaining: 0,
+      }),
+    },
+
+    /* ================= INTERVIEWS ================= */
+    interviewAttempts: [interviewAttemptSchema],
+
     /* ================= WATCH LATER ================= */
     savedVideos: [
       {
@@ -242,9 +359,9 @@ googleId: {
     courseProgress: [courseProgressSchema],
 
     feedbacks: [feedbackSchema],
-    /* ================= APTITUDE ================= */
-aptitudeAttempts: [aptitudeAttemptSchema],
 
+    /* ================= APTITUDE ================= */
+    aptitudeAttempts: [aptitudeAttemptSchema],
 
     /* ================= PROFILE ================= */
     phone: String,

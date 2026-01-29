@@ -8,7 +8,7 @@
 //    PROFILE
 // ========================================================= */
 // router.get("/me", verifyToken, async (req, res) => {
-//   const user = await User.findById(req.userId).select("-password");
+//   const user = await User.findById(req.user.id).select("-password");
 //   if (!user) return res.status(404).json({ message: "User not found" });
 //   res.json({ success: true, user });
 // });
@@ -32,7 +32,7 @@
 //     return res.status(400).json({ message: "Missing data" });
 //   }
 
-//   const user = await User.findById(req.userId);
+//   const user = await User.findById(req.user.id);
 //   if (!user) {
 //     return res.status(401).json({ message: "User not found" });
 //   }
@@ -85,7 +85,7 @@
 //     return res.status(400).json({ message: "Invalid data" });
 //   }
 
-//   const user = await User.findById(req.userId);
+//   const user = await User.findById(req.user.id);
 //   if (!user) return res.status(404).json({ message: "User not found" });
 
 //   // ✅ GUARD
@@ -150,7 +150,7 @@
 //   async (req, res) => {
 //     const { courseId, channelId } = req.params;
 
-//     const user = await User.findById(req.userId).lean();
+//     const user = await User.findById(req.user.id).lean();
 //     if (!user) return res.status(404).json({ message: "User not found" });
 
 //     const courses = user.courseProgress || [];
@@ -170,7 +170,7 @@
 //    MY LEARNING
 // ========================================================= */
 // router.get("/my-learning", verifyToken, async (req, res) => {
-//   const user = await User.findById(req.userId).lean();
+//   const user = await User.findById(req.user.id).lean();
 //   if (!user) return res.status(404).json({ message: "User not found" });
 
 //   const courses = user.courseProgress || [];
@@ -220,7 +220,7 @@
 //   async (req, res) => {
 //     const { courseId, channelId } = req.params;
 
-//     const user = await User.findById(req.userId);
+//     const user = await User.findById(req.user.id);
 //     if (!user) return res.status(404).json({ message: "User not found" });
 
 //     user.courseProgress = (user.courseProgress || []).filter(
@@ -243,7 +243,7 @@
 //     return res.status(400).json({ message: "Video ID required" });
 //   }
 
-//   const user = await User.findById(req.userId);
+//   const user = await User.findById(req.user.id);
 //   if (!user) return res.status(404).json({ message: "User not found" });
 
 //   const exists = user.savedVideos.find((v) => v.videoId === videoId);
@@ -265,7 +265,7 @@
 // });
 
 // router.get("/watch-later", verifyToken, async (req, res) => {
-//   const user = await User.findById(req.userId).lean();
+//   const user = await User.findById(req.user.id).lean();
 //   if (!user) return res.status(404).json({ message: "User not found" });
 
 //   res.json({ success: true, data: user.savedVideos || [] });
@@ -281,7 +281,7 @@
 //     return res.status(400).json({ message: "Invalid data" });
 //   }
 
-//   const user = await User.findById(req.userId);
+//   const user = await User.findById(req.user.id);
 //   if (!user) return res.status(404).json({ message: "User not found" });
 
 //   if (!user.courseProgress) {
@@ -307,7 +307,7 @@
 // ========================================================= */
 // router.get("/dashboard", verifyToken, async (req, res) => {
 //   try {
-//     const user = await User.findById(req.userId).lean();
+//     const user = await User.findById(req.user.id).lean();
 //     if (!user) {
 //       return res.status(404).json({ message: "User not found" });
 //     }
@@ -493,13 +493,13 @@
 //       return res.status(400).json({ message: "Missing feedback data" });
 //     }
 
-//     const user = await User.findById(req.userId);
+//     const user = await User.findById(req.user.id);
 //     if (!user) return res.status(404).json({ message: "User not found" });
 
 //     const isCourseFeedback = Boolean(courseId && channelId);
 
 //     user.feedbacks.push({
-//       userId: req.userId,
+//       userId: req.user.id,
 //       courseId: isCourseFeedback ? courseId : null,
 //       channelId: isCourseFeedback ? channelId : null,
 //       type: isCourseFeedback ? "course" : "general",
@@ -539,7 +539,7 @@
 //     return res.status(400).json({ message: "Invalid aptitude data" });
 //   }
 
-//   const user = await User.findById(req.userId);
+//   const user = await User.findById(req.user.id);
 //   if (!user) {
 //     return res.status(401).json({ message: "User not found" });
 //   }
@@ -587,7 +587,7 @@
 // ========================================================= */
 // router.get("/aptitude/attempts", verifyToken, async (req, res) => {
 //   try {
-//     const user = await User.findById(req.userId)
+//     const user = await User.findById(req.user.id)
 //       .select("aptitudeAttempts")
 //       .lean();
 
@@ -610,7 +610,7 @@
 // ========================================================= */
 // router.get("/aptitude/latest", verifyToken, async (req, res) => {
 //   try {
-//     const user = await User.findById(req.userId)
+//     const user = await User.findById(req.user.id)
 //       .select("aptitudeAttempts")
 //       .lean();
 
@@ -662,7 +662,7 @@ const router = express.Router();
    PROFILE
 ========================================================= */
 router.get("/me", verifyToken, async (req, res) => {
-  const user = await User.findById(req.userId).select("-password");
+  const user = await User.findById(req.user.id).select("-password");
   if (!user) return res.status(404).json({ message: "User not found" });
   res.json({ success: true, user });
 });
@@ -684,7 +684,7 @@ router.post("/start-learning", verifyToken, async (req, res) => {
     return res.status(400).json({ message: "Missing data" });
   }
 
-  const user = await User.findById(req.userId);
+  const user = await User.findById(req.user.id);
   if (!user) {
     return res.status(401).json({ message: "User not found" });
   }
@@ -735,7 +735,7 @@ router.post("/video-progress", verifyToken, async (req, res) => {
     return res.status(400).json({ message: "Invalid data" });
   }
 
-  const user = await User.findById(req.userId);
+  const user = await User.findById(req.user.id);
   if (!user) return res.status(404).json({ message: "User not found" });
 
   // ✅ GUARD
@@ -798,7 +798,7 @@ router.get(
   async (req, res) => {
     const { courseId, channelId } = req.params;
 
-    const user = await User.findById(req.userId).lean();
+    const user = await User.findById(req.user.id).lean();
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const courses = user.courseProgress || [];
@@ -818,7 +818,7 @@ router.get(
    MY LEARNING
 ========================================================= */
 router.get("/my-learning", verifyToken, async (req, res) => {
-  const user = await User.findById(req.userId).lean();
+  const user = await User.findById(req.user.id).lean();
   if (!user) return res.status(404).json({ message: "User not found" });
 
   const courses = user.courseProgress || [];
@@ -867,7 +867,7 @@ router.delete(
   async (req, res) => {
     const { courseId, channelId } = req.params;
 
-    const user = await User.findById(req.userId);
+    const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
     user.courseProgress = (user.courseProgress || []).filter(
@@ -890,7 +890,7 @@ router.post("/watch-later", verifyToken, async (req, res) => {
     return res.status(400).json({ message: "Video ID required" });
   }
 
-  const user = await User.findById(req.userId);
+  const user = await User.findById(req.user.id);
   if (!user) return res.status(404).json({ message: "User not found" });
 
   const exists = user.savedVideos.find((v) => v.videoId === videoId);
@@ -912,7 +912,7 @@ router.post("/watch-later", verifyToken, async (req, res) => {
 });
 
 router.get("/watch-later", verifyToken, async (req, res) => {
-  const user = await User.findById(req.userId).lean();
+  const user = await User.findById(req.user.id).lean();
   if (!user) return res.status(404).json({ message: "User not found" });
 
   res.json({ success: true, data: user.savedVideos || [] });
@@ -928,7 +928,7 @@ router.post("/update-course-total", verifyToken, async (req, res) => {
     return res.status(400).json({ message: "Invalid data" });
   }
 
-  const user = await User.findById(req.userId);
+  const user = await User.findById(req.user.id);
   if (!user) return res.status(404).json({ message: "User not found" });
 
   if (!user.courseProgress) {
@@ -954,7 +954,7 @@ router.post("/update-course-total", verifyToken, async (req, res) => {
 ========================================================= */
 router.get("/dashboard", verifyToken, async (req, res) => {
   try {
-    const user = await User.findById(req.userId).lean();
+    const user = await User.findById(req.user.id).lean();
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -1135,13 +1135,13 @@ router.post("/feedback", verifyToken, async (req, res) => {
       return res.status(400).json({ message: "Missing feedback data" });
     }
 
-    const user = await User.findById(req.userId);
+    const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const isCourseFeedback = Boolean(courseId && channelId);
 
     user.feedbacks.push({
-      userId: req.userId,
+      userId: req.user.id,
       courseId: isCourseFeedback ? courseId : null,
       channelId: isCourseFeedback ? channelId : null,
       type: isCourseFeedback ? "course" : "general",
@@ -1181,7 +1181,7 @@ router.post("/aptitude/submit", verifyToken, async (req, res) => {
     return res.status(400).json({ message: "Invalid aptitude data" });
   }
 
-  const user = await User.findById(req.userId);
+  const user = await User.findById(req.user.id);
   if (!user) {
     return res.status(401).json({ message: "User not found" });
   }
@@ -1223,7 +1223,7 @@ router.post("/aptitude/submit", verifyToken, async (req, res) => {
 ========================================================= */
 router.get("/aptitude/attempts", verifyToken, async (req, res) => {
   try {
-    const user = await User.findById(req.userId)
+    const user = await User.findById(req.user.id)
       .select("aptitudeAttempts")
       .lean();
 
@@ -1246,7 +1246,7 @@ router.get("/aptitude/attempts", verifyToken, async (req, res) => {
 ========================================================= */
 router.get("/aptitude/latest", verifyToken, async (req, res) => {
   try {
-    const user = await User.findById(req.userId)
+    const user = await User.findById(req.user.id)
       .select("aptitudeAttempts")
       .lean();
 
