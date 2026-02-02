@@ -40,6 +40,10 @@ export const useAuthStore = create((set) => ({
         set({ isLoading: true, error: null, message: null });
         try {
             const response = await axios.post(`${API_URL}/login`, { email, password });
+            // ✅ Store token in localStorage for socket connection
+            if (response.data.token) {
+                localStorage.setItem("token", response.data.token);
+            }
             set({
                 isAuthenticated: true,
                 user: response.data.user,
@@ -59,6 +63,8 @@ export const useAuthStore = create((set) => ({
         set({ isLoading: true, error: null });
         try {
             await axios.post(`${API_URL}/logout`);
+            // ✅ Clear token from localStorage on logout
+            localStorage.removeItem("token");
             set({ 
                 user: null, 
                 isAuthenticated: false, 
@@ -75,6 +81,10 @@ export const useAuthStore = create((set) => ({
         set({ isLoading: true, error: null });
         try {
             const response = await axios.post(`${API_URL}/verify-email`, { code });
+            // ✅ Store token in localStorage for socket connection
+            if (response.data.token) {
+                localStorage.setItem("token", response.data.token);
+            }
             set({ 
                 user: response.data.user, 
                 isAuthenticated: true,  // ✅ Now authenticated after verification

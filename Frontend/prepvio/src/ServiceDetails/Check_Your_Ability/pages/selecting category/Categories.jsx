@@ -340,7 +340,7 @@ const Categories = () => {
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => navigate("/dashboard/payroll")}
+                    onClick={() => navigate("/dashboard/pricing")}
                     className="flex-1 px-8 py-4 rounded-full bg-[#1A1A1A] text-white font-bold hover:bg-[#2A2A2A] transition-all shadow-xl shadow-gray-300/50 relative overflow-hidden group"
                   >
                     <span className="relative z-10">{isFreePlan ? "Upgrade Now" : "Get Credits"}</span>

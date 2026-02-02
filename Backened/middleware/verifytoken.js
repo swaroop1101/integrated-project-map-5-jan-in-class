@@ -60,7 +60,7 @@ export const verifyToken = async (req, res, next) => {
       });
     }
 
-    req.user = { id: user._id };
+    req.userId = user._id; // ✅ Set req.userId for consistency
     next();
   } catch (error) {
     console.error("verifyToken error:", error.message);

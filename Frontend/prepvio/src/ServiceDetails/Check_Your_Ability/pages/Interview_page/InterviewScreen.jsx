@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import axios from "axios";
 
 // Import the coding questions
 import { codingQuestions } from "./codingQuestions";
@@ -742,14 +743,43 @@ const InterviewScreen = ({
   const [deviationWarnings, setDeviationWarnings] = useState(0);
   const [codingCount, setCodingCount] = useState(0);
   const [selectedCodingQuestions, setSelectedCodingQuestions] = useState([]);
+  const [rounds, setRounds] = useState([]);
+  const [hasCodingRound, setHasCodingRound] = useState(false);
 
   const navigate = useNavigate();
 
-  // Initialize random coding questions on component mount
+  // Fetch rounds for the selected company and role
   useEffect(() => {
-    const questions = getRandomCodingQuestions(3);
-    setSelectedCodingQuestions(questions);
-  }, []);
+    const fetchRounds = async () => {
+      try {
+        const response = await axios.get(
+          `http://localhost:5000/api/companies/${encodeURIComponent(companyType)}/${encodeURIComponent(role)}/rounds`
+        );
+        const roundsList = response.data;
+        setRounds(roundsList);
+        
+        // Check if coding round exists
+        const hasCoding = roundsList.some(
+          (round) => round.name.toLowerCase() === "coding"
+        );
+        setHasCodingRound(hasCoding);
+
+        // Initialize coding questions only if coding round exists
+        if (hasCoding) {
+          const questions = getRandomCodingQuestions(3);
+          setSelectedCodingQuestions(questions);
+        }
+      } catch (error) {
+        console.error("Error fetching rounds:", error);
+        // Default to not having coding round if fetch fails
+        setHasCodingRound(false);
+      }
+    };
+
+    if (companyType && role) {
+      fetchRounds();
+    }
+  }, [companyType, role]);
 
   useEffect(() => {
     const consumeCredit = async () => {
@@ -768,7 +798,7 @@ const InterviewScreen = ({
           
           if (data.requiresPayment || data.needsUpgrade) {
             alert(`⚠️ ${data.message}`);
-            navigate("/dashboard/payroll", { replace: true });
+            navigate("/dashboard/pricing", { replace: true });
           }
         }
       }
@@ -1026,6 +1056,15 @@ Provide constructive feedback in this EXACT format (no additional text):
 SUGGESTION: [One specific improvement suggestion in 1-2 sentences]
 EXAMPLE: [A better way to phrase the answer in 1 sentence]
 
+You are a ruthless senior interviewer.
+Do NOT sugarcoat feedback.
+If the answer is vague, say so clearly.
+
+Rules:
+- Do NOT praise unless the answer is genuinely strong
+- Explicitly call out missing depth, weak reasoning, or lack of justification
+
+
 Keep it concise and actionable.`;
 
       const feedbackMessages = [
@@ -1066,6 +1105,44 @@ Keep it concise and actionable.`;
     setCurrentAiSpeech("");
     setTimeout(() => startSpeechRecognition(), 500);
   }, []);
+
+  const startFinalRound = async () => {
+  try {
+    const systemInstruction = `
+You are Sira, conducting the FINAL ROUND of the interview.
+
+Ask ONE question at a time in this order:
+1. Salary expectations
+2. Preferred work mode (remote/hybrid/office)
+3. Notice period / availability
+4. Benefits expectations
+5. Ask if they have questions for us
+
+Be professional and realistic.
+Do NOT ask multiple questions at once.
+`;
+
+    const aiReply = await fetchFireworksContent(
+      formatHistoryForFireworks(chatMessages),
+      systemInstruction
+    );
+
+    setChatMessages((prev) => [
+      ...prev,
+      {
+        sender: "AI",
+        text: aiReply.trim(),
+        time: new Date().toLocaleTimeString(),
+        stage: "final",
+      },
+    ]);
+
+    textToSpeech(aiReply);
+  } catch (err) {
+    console.error("Final round failed:", err);
+  }
+};
+
 
   const textToSpeech = useCallback((text) => {
     if (!text) return;
@@ -1110,8 +1187,9 @@ Keep it concise and actionable.`;
       const transQ = aiCount("transition");
       const techQ = aiCount("technical");
 
-      if (interviewStage === "intro" && introQ >= 2) {
-        const msg = "Great. Let's move forward. I'll now ask you a few pre-technical questions.";
+      // More realistic interview timing - increase questions per round (15-20 min total)
+      if (interviewStage === "intro" && introQ >= 3) {
+        const msg = "Great. Let's move forward. I'll now ask you a few pre-technical questions to understand your experience better.";
         setInterviewStage("transition");
         setIsLoadingAI(false);
 
@@ -1129,8 +1207,8 @@ Keep it concise and actionable.`;
         return;
       }
 
-      if (interviewStage === "transition" && transQ >= 1) {
-        const msg = "Now let's begin the technical round. I'll ask you concept-based questions.";
+      if (interviewStage === "transition" && transQ >= 3) {
+        const msg = "Excellent. Now let's dive into the technical round. I'll ask you deeper concept-based questions related to your field.";
         setInterviewStage("technical");
         setIsLoadingAI(false);
 
@@ -1148,7 +1226,31 @@ Keep it concise and actionable.`;
         return;
       }
 
-      if (interviewStage === "technical" && techQ >= 4) {
+      if (interviewStage === "technical" && techQ >= 6) {
+        // Check if this role has a coding round
+        if (!hasCodingRound) {
+          const msg = "Thank you for participating in this interview. That concludes our technical assessment. We'll get back to you soon with feedback.";
+
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              sender: "AI",
+              text: msg,
+              time: new Date().toLocaleTimeString(),
+              stage: "technical",
+            },
+          ]);
+
+          textToSpeech(msg);
+          
+          // End interview after a delay
+          setTimeout(() => {
+            setInterviewStage("end");
+          }, 2000);
+
+          return;
+        }
+
         const msg = "That concludes the technical round. We will now move to the coding round.";
 
         setChatMessages((prev) => [
@@ -1197,104 +1299,182 @@ let systemInstruction = "";
 
 if (interviewStage === "intro")
   systemInstruction = `
-You are Jenny, a professional AI interviewer conducting the INTRODUCTION round for a ${role} position at a ${companyType}.
+You are Sira, a professional AI interviewer conducting the INTRODUCTION round for a ${role} position at a ${companyType}.
 
-CONTEXT: This is the first part of the interview where you get to know the candidate.
+CONTEXT: This is the first part of the interview where you get to know the candidate and establish rapport. Keep this round engaging and conversational - aim for 2-3 minutes total.
+
+ROLE CONTEXT: The position is ${role} at ${companyType}.
 
 YOUR BEHAVIOR:
-- Be warm, friendly, and professional
-- Ask ONE clear question at a time
-- Keep questions between 20-25 words
-- Listen to their answer and acknowledge it briefly before moving to the next question
-- If their answer is too brief, ask a natural follow-up to dig deeper
+- Be warm, friendly, and genuinely interested in their background
+- Ask ONE clear, open-ended question at a time
+- Listen carefully to their response
+- After they answer, provide brief positive acknowledgment, then smoothly ask your next question
+- If their answer is incomplete or vague, naturally ask a follow-up like: "Can you tell me more about that?" or "What specifically drew you to this?"
+- Keep conversation flowing naturally - this isn't a quiz, it's a dialogue
 
-QUESTION TYPES FOR THIS ROUND:
-- "Tell me about yourself and your background"
-- "Why are you interested in this ${role} position?"
-- "What attracts you to working at a ${companyType}?"
-- "Walk me through your resume"
+RUTHLESS INTERVIEW MODE (MANDATORY):
+- Do NOT accept high-level or buzzword-heavy answers
+- In roughly 40% of responses, challenge the candidate with a counter-question
+- Counter-questions must be unexpected but relevant
+- Maintain a calm, firm, senior-interviewer tone
 
-REMEMBER: Respond naturally to what they say. If they give a good answer, acknowledge it positively. If unclear, ask for clarification.
+WHEN TO CHALLENGE:
+- If the candidate proposes an approach → ask WHY
+- If they mention a tool, framework, or pattern → ask WHY NOT an alternative
+- If they ignore scale, trade-offs, or constraints → call it out
+
+COUNTER-QUESTION EXAMPLES (use selectively):
+- "Why did you choose this approach instead of the alternative?"
+- "What trade-offs are you accepting with this design?"
+- "How would this break at scale?"
+- "Why is this better than a simpler solution?"
+- "What assumptions are you making here?"
+- "If this failed in production, where would it fail first?"
+
+RULE:
+- Do NOT challenge every answer
+- Do NOT warn the candidate before challenging
+
+QUESTIONS TO ASK (one per turn):
+1. "Tell me about your professional background and what led you to pursue ${role} development?"
+2. "What specific projects or experiences have you worked on that relate to this ${role} position?"
+3. "What excites you most about the prospect of working as a ${role} at ${companyType}, and what are you hoping to achieve in your next role?"
+
+IMPORTANT INSTRUCTIONS:
+- After each question, WAIT for their answer, then acknowledge it before asking the next question
+- Acknowledge means: "That sounds great", "I appreciate that perspective", "Good experience", etc.
+- Be encouraging and positive throughout
+- Each answer should be 30-60 seconds - if too brief, ask probing follow-ups
+- Don't rush - let the conversation flow naturally
 `;
 
 else if (interviewStage === "transition")
   systemInstruction = `
-You are Jenny, conducting the PRE-TECHNICAL round for a ${role} position.
+You are Sira, conducting the PRE-TECHNICAL round for a ${role} position at ${companyType}.
 
-CONTEXT: Bridge between HR questions and deep technical assessment.
+CONTEXT: This bridges personal background and deep technical knowledge. You're assessing their foundational understanding, approach to problems, and technical confidence - aim for 2-3 minutes.
 
 YOUR BEHAVIOR:
-- Acknowledge their previous answer briefly if relevant
-- Ask ONE conceptual or light technical question (20-25 words)
-- Be conversational but professional
-- This should feel like a natural progression from the intro
+- Reference something from their intro answers when relevant
+- Ask ONE focused technical question at a time
+- Ask 3 questions total in this round
+- Questions should assess core ${role} concepts and real-world application
+- Be conversational and encouraging - they're warming up to technical topics
+- If answer seems shallow, ask for clarification: "Can you elaborate on that?" or "How did you approach that challenge?"
+- Each response should be 30-45 seconds
 
-QUESTION TYPES:
-- "What's your experience with [relevant technology/framework]?"
-- "How do you typically approach problem-solving in development?"
-- "What development tools and environments are you most comfortable with?"
-- "Can you explain your understanding of [basic technical concept]?"
+QUESTIONS TO ASK (one per turn):
+1. "Based on your experience with ${role} projects, how do you typically approach [core technology/concept]? Can you walk me through your workflow?"
+2. "Tell me about the key technologies and frameworks you've worked with in ${role} roles. Which are you most confident with and why?"
+3. "Can you explain your understanding of [fundamental concept important for ${role}] and describe a time you applied it in a real project?"
 
-Keep it conversational - you're assessing their thinking process, not testing memorization yet.
+CRITICAL POINTS:
+- Listen actively to their answers
+- Show you're engaged by acknowledging understanding
+- If they struggle, offer simpler explanations, not answers
+- Be supportive - they're transitioning to harder technical questions
+- Reference their earlier answers when possible to show continuity
 `;
 
 else if (interviewStage === "technical")
   systemInstruction = `
-You are Jenny, conducting the TECHNICAL ASSESSMENT round for a ${role} position.
+You are Sira, conducting the TECHNICAL DEEP-DIVE round for a ${role} position at ${companyType}.
 
-CONTEXT: Deep-dive into technical knowledge and problem-solving approach.
+CONTEXT: This is the rigorous technical assessment round where you probe their knowledge depth, problem-solving approach, and system design thinking - aim for 5-7 minutes with 6 questions.
+
+POSITION SPECIFICS: ${role} at ${companyType}
 
 YOUR BEHAVIOR:
-- Ask ONE focused technical question at a time (20-25 words)
-- If they give a surface-level answer, probe deeper with follow-ups
-- Reference specific technologies relevant to ${role}
-- Be encouraging but thorough
+- Ask ONE focused technical question per turn
+- Ask exactly 6 deep technical questions total in this round
+- Build questions on their previous answers when possible
+- If answers are surface-level, ALWAYS follow up with: "Can you dive deeper into that?" or "Walk me through your approach step by step" or "Can you give me a concrete example from your work?"
+- Reference real-world scenarios relevant to ${role}
+- Be thorough but encouraging
+- Each answer should be 45-90 seconds to develop properly
 
-QUESTION TYPES:
-- Explain core concepts: "Can you explain how [technology/concept] works under the hood?"
-- Architecture decisions: "How would you design a system that needs to [requirement]?"
-- Best practices: "What considerations would you have when [technical scenario]?"
-- Trade-offs: "When would you choose [option A] over [option B] and why?"
-- Real-world scenarios: "If you encountered [problem], how would you debug it?"
+QUESTION PROGRESSION:
+1. CORE CONCEPTS: "Explain [fundamental ${role} concept]. Why is this important, and how have you used it?"
+2. PRACTICAL APPLICATION: "Tell me about a challenging project where you had to apply [concept]. What obstacles did you encounter and how did you solve them?"
+3. SYSTEM DESIGN: "How would you design and architect [realistic solution], and why did you choose this approach over at least one alternative?"
+4. TRADE-OFFS & DECISIONS: "When building X, what trade-offs would you make, and why did you reject the other options?"
+5. PROBLEM-SOLVING: "If you encountered [technical problem that ${role} professionals face], how would you systematically approach debugging and fixing it?"
+6. BEST PRACTICES: "In your experience, how do you ensure [quality attribute like performance, security, maintainability] in ${role} work? What practices and patterns do you follow?"
 
-IMPORTANT: Listen to their answer. If incomplete, ask: "Can you elaborate on that?" or "What else would you consider?"
+CRITICAL INSTRUCTIONS:
+- ALWAYS probe deeper if responses are incomplete or generic
+- Use follow-ups like: "Can you walk me through that step by step?", "Can you provide a specific example?", "How would that scale?", "What about edge cases?"
+- Reference their earlier answers to show engagement and continuity
+- Be encouraging but rigorous - assess both knowledge and communication
+- DO NOT rush answers - each should fully develop into 1-2 minute responses
+- If they say "I don't know", ask: "What would you do to figure it out?" or "How would you approach learning that?"
 `;
 
 else if (interviewStage === "coding")
   systemInstruction = `
-You are Jenny, overseeing the CODING round.
+You are Sira, overseeing the CODING round.
 
-CONTEXT: The candidate is solving coding problems in the code editor.
+CONTEXT: The candidate is solving coding problems in the code editor. They should work independently.
 
 YOUR BEHAVIOR:
-- Do NOT ask new questions
-- Only respond if the candidate asks for clarification about the problem
-- If they ask for hints, provide subtle guidance without giving away the solution
+- Do NOT ask new questions or introduce new problems unless they ask
+- Only respond if the candidate asks for clarification about the current problem statement
+- If they ask for hints, provide subtle, indirect guidance without giving away the solution
 - Acknowledge when they complete or skip a problem
-- Be supportive and encouraging
+- Be supportive and encouraging throughout
+- Keep responses brief and focused
+- If the candidate gives a generic or buzzword-heavy answer, immediately ask a follow-up "why" or "how exactly"
 
-If they seem stuck and ask for help, say something like: "Think about the edge cases" or "Consider the time complexity of your approach."
+HELPFUL RESPONSES IF THEY GET STUCK:
+- "Think about the edge cases and boundaries"
+- "Consider the time and space complexity of your approach"
+- "What's the simplest version of this problem you could solve?"
+- "Try working through a specific example manually first"
+- "You're on the right track - keep thinking about [aspect]"
+
+COMPLETION ACKNOWLEDGMENT:
+- "Great work! You've completed this problem. Let's move to the next one."
+- "Good effort on that problem. Let's continue."
 `;
 
 else if (interviewStage === "final")
   systemInstruction = `
-You are Jenny, conducting the CLOSING round of the interview.
+You are Sira, conducting the FINAL ROUND of the interview.
 
-CONTEXT: Wrapping up the interview professionally.
+CONTEXT: This is the closing stage where you discuss practical matters, logistics, and give the candidate an opportunity to ask questions. This happens AFTER the technical assessment.
 
 YOUR BEHAVIOR:
-- Acknowledge their performance positively
-- Ask ONE closing question (20-25 words)
-- Be warm and encouraging
-- This is about culture fit and their questions
+- Acknowledge their overall performance positively and specifically (reference specific strengths from the interview)
+- Ask questions about practical matters in this order
+- Be warm, encouraging, and professional
+- This round covers logistics, expectations, and ensures mutual fit
+- Allow 5-10 minutes for this round with 4-5 questions
 
-QUESTION TYPES:
-- "Do you have any questions about the role or our company?"
-- "Where do you see yourself in the next few years?"
-- "What's most important to you in your next role?"
-- "Is there anything else you'd like us to know about you?"
+QUESTION SEQUENCE (ask one at a time):
+1. "We're very impressed with your technical knowledge and problem-solving approach. Before we move forward, let's discuss some practical aspects of the role. What are your salary expectations for this ${role} position?"
 
-After their answer, thank them professionally: "Thank you for your time today. We'll be in touch soon with next steps."
+2. "What type of work arrangement would be ideal for you - are you looking for fully remote, hybrid, or in-office work? And how important is flexibility in your work schedule?"
+
+3. "When would you ideally be able to start if we moved forward with an offer? Do you have any notice period with your current employer that we should consider?"
+
+4. "Are there any specific benefits or perks that are particularly important to you? For example, professional development opportunities, health insurance, stock options, flexible hours, etc.?"
+
+5. "Do you have any questions for us about the role, the team, the company culture, or the growth opportunities in this position?"
+
+CRITICAL INSTRUCTIONS:
+- Listen carefully to their responses about compensation and logistics
+- Be transparent about the role's requirements and flexibility
+- Show genuine interest in their needs and concerns
+- These questions help both parties understand if there's mutual fit
+- If they ask questions you don't know, say: "That's a great question. I'll make sure our hiring team addresses that in the next conversation."
+
+CLOSING (after their final answer):
+"Thank you so much for your comprehensive responses throughout this interview. I genuinely enjoyed learning about your experience, your technical knowledge, and understanding what you're looking for in your next role at ${companyType}. 
+
+We're impressed with your ${role} capabilities and your thoughtful approach to problem-solving. Our team will review everything we discussed, and we'll be reaching out within 2-3 business days with next steps - whether that's moving forward with further interviews or our final offer.
+
+In the meantime, if you have any follow-up questions, please don't hesitate to reach out. It was a pleasure speaking with you, and we're excited about the possibility of having you join our ${companyType} team!"
 `;
  
 
@@ -1304,14 +1484,12 @@ After their answer, thank them professionally: "Thank you for your time today. W
         ]);
 
         const aiReplyRaw = await fetchFireworksContent(
-          formattedHistory,
-          systemInstruction
-        );
+  formattedHistory,
+  systemInstruction
+);
 
-        const aiReply = aiReplyRaw
-          .split(" ")
-          .slice(0, 25)
-          .join(" ");
+const aiReply = aiReplyRaw.trim();
+
 
         setCurrentQuestionIndex(prev => prev + 1);
         setCurrentQuestionText(aiReply);
@@ -1553,16 +1731,23 @@ After their answer, thank them professionally: "Thank you for your time today. W
     if (cameraAllowed && companyType && role && !greeted) {
       const startAiConversation = async () => {
         try {
-          const greetingPrompt = `
-You are Jenny, a professional AI interviewer.
+      const greetingPrompt = `
+You are Sira, a professional AI interviewer for ${companyType}.
 
-INTRODUCTION:
-"Hello! I'm Jenny, and I'll be conducting your interview today for the ${role} position at our ${companyType}. I'm excited to learn more about you and your experience. This interview will have multiple rounds covering your background, technical knowledge, and problem-solving skills.
+Your EXACT opening greeting (be warm and welcoming, NOT robotic):
+"Hello! I'm Sira, your AI interviewer. I'll be conducting your interview today for the ${role} position at ${companyType}. I'm genuinely excited to learn more about you, your experience, and what drives your interest in this role. 
 
-Let's start with getting to know you better. Can you tell me about yourself and what drew you to apply for this ${role} position?"
+We'll be going through several rounds today - starting with getting to know you better, then diving into your technical knowledge, and if applicable, some coding challenges. Throughout this interview, I want you to feel comfortable sharing your thoughts and asking questions.
 
-Use this exact greeting format. Be warm, professional, and encouraging.
+So, let's start at the beginning. Can you tell me about yourself - your background, your professional journey, and what initially drew you to pursue ${role} development?"
+
+Key points:
+- Be conversational and genuinely interested, not scripted
+- Welcome their questions at any time
+- Set a relaxed, professional tone
+- Make the opening question open-ended to let them talk freely
 `;
+
 
           setIsLoadingAI(true);
           setChatMessages([]);
@@ -1662,7 +1847,7 @@ Use this exact greeting format. Be warm, professional, and encouraging.
                 <div className="absolute top-6 left-6 bg-gradient-to-r from-[#D4F478]/20 to-emerald-500/20 backdrop-blur-lg text-white px-4 py-2 rounded-full text-sm font-medium border border-[#D4F478]/30">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-[#D4F478] rounded-full animate-pulse"></div>
-                    Jenny is speaking…
+                    Sira is speaking…
                   </div>
                 </div>
               )}
@@ -1736,7 +1921,7 @@ Use this exact greeting format. Be warm, professional, and encouraging.
               </Canvas>
 
               <div className="absolute bottom-4 left-4 bg-gradient-to-r from-[#D4F478]/20 to-emerald-500/20 backdrop-blur-lg text-white px-4 py-2 rounded-full text-sm font-medium border border-[#D4F478]/30">
-                <span className="font-bold">Ms. Jenny</span>
+                <span className="font-bold">Ms. Sira</span>
                 <span className="text-[#D4F478] ml-2">• AI Interviewer</span>
               </div>
             </motion.div>
@@ -1763,7 +1948,7 @@ Use this exact greeting format. Be warm, professional, and encouraging.
                         }`}
                     >
                       <div className="text-sm font-medium mb-1">
-                        {msg.sender === "User" ? "You" : "Jenny"}
+                        {msg.sender === "User" ? "You" : "Sira"}
                       </div>
                       <p className="text-sm">{msg.text}</p>
                       <div className="text-xs text-gray-500 mt-2">{msg.time}</div>
@@ -1785,7 +1970,7 @@ Use this exact greeting format. Be warm, professional, and encouraging.
                         <div className="w-2 h-2 bg-[#D4F478] rounded-full animate-pulse"></div>
                         <div className="w-2 h-2 bg-[#D4F478] rounded-full animate-pulse delay-150"></div>
                         <div className="w-2 h-2 bg-[#D4F478] rounded-full animate-pulse delay-300"></div>
-                        <span className="text-sm text-gray-600 ml-2">Jenny is thinking...</span>
+                        <span className="text-sm text-gray-600 ml-2">Sira is thinking...</span>
                       </div>
                     </div>
                   </div>
@@ -1883,7 +2068,13 @@ Use this exact greeting format. Be warm, professional, and encouraging.
 
       textToSpeech(msg);
       setInterviewStage("final");
-      return newCount;
+
+setTimeout(() => {
+  startFinalRound();
+}, 800);
+
+return newCount;
+
     }
 
     const nextProblem = selectedCodingQuestions[newCount];

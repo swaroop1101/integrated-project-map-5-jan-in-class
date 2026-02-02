@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Bell, 
@@ -12,6 +12,8 @@ import {
   Zap,
   Mail
 } from "lucide-react";
+import { useNotificationStore } from "../store/notificationStore";
+import socket from "../socket";
 
 // --- ANIMATION VARIANTS ---
 const containerVariants = {
@@ -52,7 +54,7 @@ const getNotificationStyle = (type) => {
         text: "text-red-700", 
         border: "border-red-500" 
       };
-    default: // info
+    default: // info or system
       return { 
         icon: Mail, 
         bg: "bg-blue-100", 
@@ -63,67 +65,50 @@ const getNotificationStyle = (type) => {
 };
 
 function Notifications() {
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      title: "Welcome to Prepvio!",
-      message: "Chal aja bhidu, let's start your learning journey together!",
-      timestamp: "2 hours ago",
-      read: false,
-      type: "info"
-    },
-    {
-      id: 2,
-      title: "New Course Available",
-      message: "Check out the new Web Development course we just added!",
-      timestamp: "5 hours ago",
-      read: false,
-      type: "success"
-    },
-    {
-      id: 3,
-      title: "Subscription Reminder",
-      message: "Your premium subscription will expire in 3 days.",
-      timestamp: "1 day ago",
-      read: true,
-      type: "warning"
-    },
-    {
-      id: 4,
-      title: "Achievement Unlocked",
-      message: "Congratulations! You've completed 10 courses. Keep it up!",
-      timestamp: "2 days ago",
-      read: true,
-      type: "success"
-    },
-    {
-      id: 5,
-      title: "New Message",
-      message: "You have a new message from support team.",
-      timestamp: "3 days ago",
-      read: false,
-      type: "info"
+  // ✅ USE ZUSTAND STORE INSTEAD OF LOCAL STATE
+  const { addNotification } = useNotificationStore();
+
+  const {
+    notifications,
+    unreadCount,
+    fetchNotifications,
+    fetchUnreadCount,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification
+  } = useNotificationStore();
+
+  // ✅ FETCH ALL NOTIFICATIONS WHEN COMPONENT MOUNTS
+  useEffect(() => {
+    fetchNotifications();
+    fetchUnreadCount();
+  }, [fetchNotifications, fetchUnreadCount]);
+
+  const handleMarkAsRead = async (id) => {
+    await markAsRead(id);
+    fetchUnreadCount(); // Refresh unread count immediately
+    socket.emit("NOTIFICATION_READ"); // Notify other components
+  };
+
+  const handleMarkAllAsRead = async () => {
+    await markAllAsRead();
+    fetchUnreadCount(); // Refresh unread count immediately
+    socket.emit("NOTIFICATION_READ"); // Notify other components
+  };
+
+  const handleDelete = async (id) => {
+    await deleteNotification(id);
+    fetchUnreadCount(); // Refresh unread count immediately
+    socket.emit("NOTIFICATION_DELETED"); // Notify other components
+  };
+
+  const handleClearAll = async () => {
+    // Delete all notifications one by one
+    for (const notif of notifications) {
+      await deleteNotification(notif._id);
     }
-  ]);
-
-  const unreadCount = notifications.filter(n => !n.read).length;
-
-  const handleMarkAsRead = (id) => {
-    setNotifications(notifications.map(notif =>
-      notif.id === id ? { ...notif, read: true } : notif
-    ));
-  };
-
-  const handleMarkAllAsRead = () => {
-    setNotifications(notifications.map(notif => ({ ...notif, read: true })));
-  };
-
-  const handleDelete = (id) => {
-    setNotifications(notifications.filter(notif => notif.id !== id));
-  };
-
-  const handleClearAll = () => {
-    setNotifications([]);
+    fetchUnreadCount(); // Refresh unread count immediately
+    socket.emit("NOTIFICATION_DELETED"); // Notify other components
   };
 
   return (
@@ -136,10 +121,9 @@ function Notifications() {
           <div>
              <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight flex items-center gap-3">
                Notifications
+               {/* ✅ SIMPLE DOT INDICATOR */}
                {unreadCount > 0 && (
-                 <span className="bg-[#D4F478] text-black text-sm font-bold px-3 py-1 rounded-full shadow-sm">
-                   {unreadCount} New
-                 </span>
+                 <span className="w-3 h-3 bg-[#D4F478] rounded-full shadow-sm animate-pulse" />
                )}
              </h1>
              <p className="text-gray-500 font-medium mt-1">Stay updated with your latest alerts.</p>
@@ -191,7 +175,7 @@ function Notifications() {
 
                    return (
                     <motion.div
-                      key={notif.id}
+                      key={notif._id}
                       layout
                       variants={itemVariants}
                       initial="hidden"
@@ -199,7 +183,7 @@ function Notifications() {
                       exit="exit"
                       className={`
                         group relative flex items-start gap-4 p-5 rounded-2xl border transition-all duration-200
-                        ${!notif.read 
+                        ${!notif.isRead 
                            ? "bg-white border-l-4 border-l-[#1A1A1A] border-y-gray-100 border-r-gray-100 shadow-md" 
                            : "bg-gray-50/50 border-transparent hover:bg-white hover:shadow-sm"
                         }
@@ -213,23 +197,28 @@ function Notifications() {
                       {/* Content */}
                       <div className="flex-1 min-w-0 pt-0.5">
                         <div className="flex items-center justify-between gap-2 mb-1">
-                          <h4 className={`text-base font-bold truncate ${notif.read ? 'text-gray-600' : 'text-gray-900'}`}>
-                            {notif.title}
+                          <h4 className={`text-base font-bold truncate ${notif.isRead ? 'text-gray-600' : 'text-gray-900'}`}>
+                            {notif.type ? notif.type.charAt(0).toUpperCase() + notif.type.slice(1) : 'Notification'}
                           </h4>
                           <span className="text-xs font-medium text-gray-400 whitespace-nowrap">
-                            {notif.timestamp}
+                            {new Date(notif.createdAt).toLocaleString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
                           </span>
                         </div>
-                        <p className={`text-sm leading-relaxed ${notif.read ? 'text-gray-500' : 'text-gray-700'}`}>
+                        <p className={`text-sm leading-relaxed ${notif.isRead ? 'text-gray-500' : 'text-gray-700'}`}>
                           {notif.message}
                         </p>
                       </div>
 
                       {/* Actions (Hover to show on Desktop, Always visible logic can be added for mobile if needed) */}
                       <div className="flex flex-col gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                        {!notif.read && (
+                        {!notif.isRead && (
                           <button
-                            onClick={() => handleMarkAsRead(notif.id)}
+                            onClick={() => handleMarkAsRead(notif._id)}
                             className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-[#D4F478] hover:text-black transition-colors"
                             title="Mark as read"
                           >
@@ -237,7 +226,7 @@ function Notifications() {
                           </button>
                         )}
                         <button
-                          onClick={() => handleDelete(notif.id)}
+                          onClick={() => handleDelete(notif._id)}
                           className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600 transition-colors"
                           title="Delete"
                         >
@@ -246,7 +235,7 @@ function Notifications() {
                       </div>
 
                       {/* Unread Dot Indicator */}
-                      {!notif.read && (
+                      {!notif.isRead && (
                         <div className="absolute top-5 right-5 w-2 h-2 rounded-full bg-indigo-500 md:hidden" />
                       )}
                     </motion.div>
@@ -263,191 +252,3 @@ function Notifications() {
 }
 
 export default Notifications;
-
-
-
-
-//Backup code hai yeah
-// import React, { useState } from "react";
-// import { Bell, Check, X, Trash2, CheckCheck } from "lucide-react";
-
-// function Notifications() {
-//   const [notifications, setNotifications] = useState([
-//     {
-//       id: 1,
-//       title: "Welcome to Prepvio!",
-//       message: "Chal aja bhidu, let's start your learning journey together!",
-//       timestamp: "2 hours ago",
-//       read: false,
-//       type: "info"
-//     },
-//     {
-//       id: 2,
-//       title: "New Course Available",
-//       message: "Check out the new Web Development course we just added!",
-//       timestamp: "5 hours ago",
-//       read: false,
-//       type: "success"
-//     },
-//     {
-//       id: 3,
-//       title: "Subscription Reminder",
-//       message: "Your premium subscription will expire in 3 days.",
-//       timestamp: "1 day ago",
-//       read: true,
-//       type: "warning"
-//     },
-//     {
-//       id: 4,
-//       title: "Achievement Unlocked",
-//       message: "Congratulations! You've completed 10 courses. Keep it up!",
-//       timestamp: "2 days ago",
-//       read: true,
-//       type: "success"
-//     },
-//     {
-//       id: 5,
-//       title: "New Message",
-//       message: "You have a new message from support team.",
-//       timestamp: "3 days ago",
-//       read: false,
-//       type: "info"
-//     }
-//   ]);
-
-//   const unreadCount = notifications.filter(n => !n.read).length;
-
-//   const handleMarkAsRead = (id) => {
-//     setNotifications(notifications.map(notif =>
-//       notif.id === id ? { ...notif, read: true } : notif
-//     ));
-//   };
-
-//   const handleMarkAllAsRead = () => {
-//     setNotifications(notifications.map(notif => ({ ...notif, read: true })));
-//   };
-
-//   const handleDelete = (id) => {
-//     setNotifications(notifications.filter(notif => notif.id !== id));
-//   };
-
-//   const handleClearAll = () => {
-//     setNotifications([]);
-//   };
-
-//   const getNotificationColor = (type, read) => {
-//     if (read) return "bg-white/30";
-    
-//     switch(type) {
-//       case "success":
-//         return "bg-green-100/50";
-//       case "warning":
-//         return "bg-yellow-100/50";
-//       case "error":
-//         return "bg-red-100/50";
-//       default:
-//         return "bg-indigo-100/50";
-//     }
-//   };
-
-//   return (
-//     <div className="flex h-screen overflow-x-hidden p-6">
-//       <div className="flex-1">
-//         <div className="bg-white/30 backdrop-blur-2xl border border-white/50 rounded-3xl shadow-lg flex flex-col h-full transition-all duration-300">
-          
-//           <div className="p-6 border-b border-white/50">
-//             <div className="flex items-center justify-between">
-//               <h2 className="text-2xl font-semibold text-gray-800 flex items-center gap-2">
-//                 <Bell className="w-6 h-6 text-indigo-600" />
-//                 Notifications
-//                 {unreadCount > 0 && (
-//                   <span className="bg-indigo-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-//                     {unreadCount}
-//                   </span>
-//                 )}
-//               </h2>
-//               <div className="flex gap-2">
-//                 {unreadCount > 0 && (
-//                   <button
-//                     onClick={handleMarkAllAsRead}
-//                     className="text-indigo-600 hover:text-indigo-800 px-3 py-2 rounded-lg hover:bg-white/20 transition flex items-center gap-2 text-sm font-medium"
-//                   >
-//                     <CheckCheck className="w-4 h-4" />
-//                     Mark all as read
-//                   </button>
-//                 )}
-//                 {notifications.length > 0 && (
-//                   <button
-//                     onClick={handleClearAll}
-//                     className="text-red-600 hover:text-red-800 px-3 py-2 rounded-lg hover:bg-white/20 transition flex items-center gap-2 text-sm font-medium"
-//                   >
-//                     <Trash2 className="w-4 h-4" />
-//                     Clear all
-//                   </button>
-//                 )}
-//               </div>
-//             </div>
-//           </div>
-
-//           <div className="flex-1 flex flex-col p-6 space-y-4 overflow-y-auto">
-//             {notifications.length === 0 ? (
-//               <div className="flex flex-col items-center justify-center h-full text-gray-500">
-//                 <Bell className="w-16 h-16 mb-4 opacity-30" />
-//                 <p className="text-lg font-medium">No notifications</p>
-//                 <p className="text-sm">You're all caught up, bhidu!</p>
-//               </div>
-//             ) : (
-//               notifications.map((notif) => (
-//                 <div
-//                   key={notif.id}
-//                   className={`p-4 rounded-2xl ${getNotificationColor(notif.type, notif.read)} backdrop-blur-sm text-gray-800 shadow-md transition-all duration-300 hover:shadow-lg ${
-//                     !notif.read ? "border-l-4 border-indigo-500" : ""
-//                   }`}
-//                 >
-//                   <div className="flex items-start justify-between gap-3">
-//                     <div className="flex-1">
-//                       <div className="flex items-center gap-2 mb-1">
-//                         <p className="text-base font-semibold text-gray-900">
-//                           {notif.title}
-//                         </p>
-//                         {!notif.read && (
-//                           <span className="w-2 h-2 bg-indigo-500 rounded-full"></span>
-//                         )}
-//                       </div>
-//                       <p className="text-sm text-gray-700 mb-2">
-//                         {notif.message}
-//                       </p>
-//                       <p className="text-xs text-gray-500">
-//                         {notif.timestamp}
-//                       </p>
-//                     </div>
-//                     <div className="flex gap-1">
-//                       {!notif.read && (
-//                         <button
-//                           onClick={() => handleMarkAsRead(notif.id)}
-//                           className="text-indigo-600 hover:text-indigo-800 p-2 rounded-full hover:bg-white/30 transition"
-//                           title="Mark as read"
-//                         >
-//                           <Check className="w-4 h-4" />
-//                         </button>
-//                       )}
-//                       <button
-//                         onClick={() => handleDelete(notif.id)}
-//                         className="text-red-600 hover:text-red-800 p-2 rounded-full hover:bg-white/30 transition"
-//                         title="Delete"
-//                       >
-//                         <X className="w-4 h-4" />
-//                       </button>
-//                     </div>
-//                   </div>
-//                 </div>
-//               ))
-//             )}
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
-// export default Notifications;

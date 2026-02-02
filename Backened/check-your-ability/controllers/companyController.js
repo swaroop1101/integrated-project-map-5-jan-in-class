@@ -1,24 +1,26 @@
 import Company from "../models/Company.js";
 
-// ✅ Helper — normalize name for case-insensitive matching
-const formatCompanyName = (name) => name.trim().toLowerCase();
+// ✅ Helper — normalize name for case-insensitive matching (handle undefined)
+const formatCompanyName = (name) => name ? name.trim().toLowerCase() : null;
 
 // ✅ CREATE — Add new company or add new roles to existing company
 export const addCompany = async (req, res) => {
   try {
     const { name, roles } = req.body;
 
-    if (!name || !roles || !Array.isArray(roles) || roles.length === 0) {
+    if (!roles || !Array.isArray(roles) || roles.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Company name and at least one role are required",
+        message: "At least one role is required",
       });
     }
 
     const formattedName = formatCompanyName(name);
 
     // 🔍 Check if company exists (case-insensitive)
-    let company = await Company.findOne({ name: formattedName });
+    let company = formattedName 
+      ? await Company.findOne({ name: formattedName })
+      : null;
 
     if (company) {
       // ✅ Add new roles if they don’t exist already

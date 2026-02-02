@@ -237,6 +237,7 @@ import express from "express";
 import { InterviewSession } from "../models/InterviewSession.js";
 import { verifyToken } from "../../middleware/verifytoken.js";
 import { User } from "../../models/User.js"; // ✅ ADD THIS
+import { sendInterviewCompletedNotification } from "../../Utils/notificationHelper.js";
 
 const router = express.Router();
 
@@ -244,7 +245,7 @@ const router = express.Router();
 router.post("/start", verifyToken, async (req, res) => {
   try {
     const { companyType, role } = req.body;
-    const userId = req.user.id;
+    const userId = req.userId;
 
     console.log("🎯 Starting interview for user:", userId);
 
@@ -298,7 +299,7 @@ router.post("/start", verifyToken, async (req, res) => {
 
     // ✅ CREATE SESSION
     const session = await InterviewSession.create({
-      userId: req.user.id,
+      userId: userId,
       companyType,
       role,
       status: "in-progress",
@@ -315,9 +316,11 @@ router.post("/start", verifyToken, async (req, res) => {
 
   } catch (err) {
     console.error("❌ Start interview error:", err);
+    console.error("❌ Error stack:", err.stack);
     res.status(500).json({ 
       message: "Failed to start interview session",
-      error: err.message 
+      error: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
   }
 });
@@ -334,7 +337,7 @@ router.patch("/complete/:sessionId", verifyToken, async (req, res) => {
 
     const session = await InterviewSession.findOne({
       _id: sessionId,
-      userId: req.user.id,
+      userId: req.userId,
     });
 
     if (!session) {
@@ -350,6 +353,11 @@ router.patch("/complete/:sessionId", verifyToken, async (req, res) => {
 
     await session.save();
 
+    // 🔔 Send interview completion notification
+    const score = session.score || 0;
+    const role = session.role || "Unknown Role";
+    await sendInterviewCompletedNotification(req.userId, role, score);
+
     res.json({
       success: true,
       message: "Interview completed successfully",
@@ -364,7 +372,7 @@ router.patch("/complete/:sessionId", verifyToken, async (req, res) => {
 router.get("/my", verifyToken, async (req, res) => {
   try {
     const interviews = await InterviewSession.find({
-      userId: req.user.id,
+      userId: req.userId,
     })
       .sort({ startedAt: -1 })
       .select(
@@ -387,7 +395,7 @@ router.get("/:sessionId", verifyToken, async (req, res) => {
 
     const session = await InterviewSession.findOne({
       _id: sessionId,
-      userId: req.user.id,
+      userId: req.userId,
     });
 
     if (!session) {
@@ -408,7 +416,7 @@ router.delete("/:id", verifyToken, async (req, res) => {
   try {
     const session = await InterviewSession.findOne({
       _id: req.params.id,
-      userId: req.user.id,
+      userId: req.userId,
     });
 
     if (!session) {
@@ -488,7 +496,7 @@ router.get("/admin/stats", async (req, res) => {
 
 router.post("/claim-free-session", verifyToken, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.userId;
 
     console.log("🎁 Free session claim request from user:", userId);
 

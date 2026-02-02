@@ -2,8 +2,8 @@ import "./env.js";
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
-// import dotenv from "dotenv";
-// dotenv.config();
+import dotenv from "dotenv";
+dotenv.config();
 import cookieParser from "cookie-parser";
 import axios from "axios";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
@@ -11,6 +11,8 @@ import PDFDocument from "pdfkit";
 import { ConnectDB } from "./DB/ConnectDB.js";
 import passport from "passport";
 import "./config/passport.js"; 
+import http from "http";
+import { Server } from "socket.io";
 
 // Route imports
 import companyRoutes from "./check-your-ability/routes/companyRoutes.js";
@@ -19,7 +21,10 @@ import Authroute from "./Routes/Authroute.js";
 import interviewSessionRoutes from "./check-your-ability/routes/interviewSessionRoutes.js";
 import userRoutes from "./Routes/userRoutes.js";
 
-import verifyPayment from './Routes/paymentRoute.js'
+import notificationRoutes from "./Routes/notificationRoutes.js";
+
+
+import verifyPayment from "./Routes/paymentRoute.js";
 
 const nervousCaptures = new Map();
 import fs from "fs";
@@ -43,7 +48,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use("/api/interview-session", interviewSessionRoutes);
 app.use(passport.initialize());
-app.use('/api/payment', verifyPayment)
+app.use("/api/payment", verifyPayment);
 
 
 
@@ -578,6 +583,8 @@ app.use("/api/auth", Authroute);
 app.use("/api/companies", companyRoutes);
 app.use("/api/interview", interviewRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/notifications", notificationRoutes);
+
 
 
 
@@ -589,11 +596,70 @@ app.get("/health", (req, res) => {
   res.json({ status: "OK", timestamp: new Date().toISOString() });
 });
 
-// --- 9. Start Server ---
+// --- 9. Create HTTP Server & Socket.IO ---
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:5174"
+    ],
+    credentials: true
+  }
+});
+
+// --- 10. Socket.IO Connection Handler (SINGLE SOURCE OF TRUTH) ---
+io.on("connection", (socket) => {
+
+  console.log("🟢 Socket connected:", socket.id);
+
+  // 🔥 BASIC CONNECTIVITY TEST
+  socket.emit("HELLO", "Socket connection successful");
+
+  // 🔐 AUTHENTICATE: Get userId from socket auth
+  let userId = socket.handshake.auth?.userId;
+
+  if (userId) {
+    // Join user to their own room for notifications
+    socket.join(userId.toString());
+    console.log("🔌 User joined room:", userId);
+  } else {
+    // Try to verify token if userId wasn't provided
+    const token = socket.handshake.auth?.token;
+    if (token) {
+      try {
+        const jwt = require("jsonwebtoken");
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (decoded && decoded.id) {
+          userId = decoded.id;
+          socket.join(userId.toString());
+          console.log("🔌 User authenticated via token, joined room:", userId);
+        }
+      } catch (error) {
+        console.error("Token verification failed:", error.message);
+      }
+    } else {
+      console.log("⚠️ Socket connected without authentication (allowed for now)");
+    }
+  }
+
+  socket.on("disconnect", () => {
+    console.log("🔴 Socket disconnected:", socket.id);
+  });
+});
+
+// 🔥 EXPORT io FOR NOTIFICATION SERVICE
+export { io };
+
+
+// --- 11. Start Server ---
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   ConnectDB();
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log("✅ MongoDB Connected via ConnectDB()");
-  if (process.env.R2_BUCKET_NAME) console.log(`📁 R2 Bucket: ${process.env.R2_BUCKET_NAME}`);
+  if (process.env.R2_BUCKET_NAME) {
+    console.log(`📁 R2 Bucket: ${process.env.R2_BUCKET_NAME}`);
+  }
 });

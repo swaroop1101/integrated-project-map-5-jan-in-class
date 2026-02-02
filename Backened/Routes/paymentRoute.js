@@ -25,7 +25,7 @@ router.get("/plans", (req, res) => {
 router.post("/create-order", verifyToken, async (req, res) => {
   try {
     const { planId } = req.body;
-    const userId = req.user.id;
+    const userId = req.userId;
 
     if (!planId) {
       return res.status(400).json({ message: "planId is required" });
@@ -75,7 +75,7 @@ router.post("/create-order", verifyToken, async (req, res) => {
 =========================== */
 router.post("/verify", verifyToken, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.userId;
     const {
       razorpay_order_id,
       razorpay_payment_id,
@@ -178,7 +178,7 @@ res.json({
    USE INTERVIEW
 =========================== */
 router.post("/use-interview", verifyToken, async (req, res) => {
-  const userId = req.user.id;
+  const userId = req.userId;
 
   const user = await User.findById(userId);
 
@@ -204,7 +204,7 @@ router.post("/use-interview", verifyToken, async (req, res) => {
    INTERVIEW STATUS
 =========================== */
 router.get("/interview-status", verifyToken, async (req, res) => {
-  const user = await User.findById(req.user.id);
+  const user = await User.findById(req.userId);
 
   res.json({
     subscription: user.subscription,
@@ -217,7 +217,7 @@ router.get("/interview-status", verifyToken, async (req, res) => {
 =========================== */
 router.post("/consume-interview", verifyToken, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.userId;
 
     const user = await User.findById(userId);
 

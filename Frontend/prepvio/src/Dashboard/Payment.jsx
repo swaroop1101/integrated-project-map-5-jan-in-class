@@ -146,28 +146,29 @@ function Payment() {
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [paymentData, setPaymentData] = useState(null);
   const [currentPlan, setCurrentPlan] = useState(null);
+  const [activeTab, setActiveTab] = useState('pricing');
   const { refreshUser } = useAuthStore();
 
- // ✅ Fetch current subscription
-useEffect(() => {
-  const fetchSubscription = async () => {
-    try {
-      const res = await axios.get(
-        "http://localhost:5000/api/payment/interview-status",
-        { withCredentials: true }
-      );
-      
-      // ✅ Show subscription even if it's free plan with 1 credit
-      if (res.data.subscription && res.data.subscription.interviewsTotal > 0) {
-        setCurrentPlan(res.data.subscription);
+  // ✅ Fetch current subscription
+  useEffect(() => {
+    const fetchSubscription = async () => {
+      try {
+        const res = await axios.get(
+          "http://localhost:5000/api/payment/interview-status",
+          { withCredentials: true }
+        );
+        
+        // ✅ Show subscription even if it's free plan with 1 credit
+        if (res.data.subscription && res.data.subscription.interviewsTotal > 0) {
+          setCurrentPlan(res.data.subscription);
+        }
+      } catch (err) {
+        console.error("Failed to fetch subscription", err);
       }
-    } catch (err) {
-      console.error("Failed to fetch subscription", err);
-    }
-  };
+    };
 
-  fetchSubscription();
-}, [paymentSuccess]);
+    fetchSubscription();
+  }, [paymentSuccess]);
 
   // Razorpay Payment Handler
   const handlePaymentWithPlan = async (planId) => {
@@ -306,7 +307,7 @@ useEffect(() => {
                 <Check className="w-14 h-14 text-white" strokeWidth={3} />
               </div>
               <Sparkles className="absolute -top-2 -right-2 w-8 h-8 text-yellow-400 animate-pulse" />
-              <Sparkles className="absolute -bottom-2 -left-2 w-6 h-6 text-yellow-400 animate-pulse delay-75" />
+              <Sparkles className="absolute -bottom-2 -left-2 w-6 h-6 text-yellow-400 animate-pulse" style={{ animationDelay: '75ms' }} />
             </motion.div>
           </motion.div>
 
@@ -360,21 +361,21 @@ useEffect(() => {
 
           {/* Quick Actions */}
           <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-blue-50 hover:bg-blue-100 transition-colors group">
-              <Download className="w-6 h-6 text-blue-600 group-hover:scale-110 transition-transform" />
+            <button className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-blue-50 hover:bg-blue-100 transition-colors">
+              <Download className="w-6 h-6 text-blue-600 transition-transform hover:scale-110" />
               <span className="text-sm font-bold text-blue-900">Download Receipt</span>
             </button>
             
-            <button className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-green-50 hover:bg-green-100 transition-colors group">
-              <MessageCircle className="w-6 h-6 text-green-600 group-hover:scale-110 transition-transform" />
+            <button className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-green-50 hover:bg-green-100 transition-colors">
+              <MessageCircle className="w-6 h-6 text-green-600 transition-transform hover:scale-110" />
               <span className="text-sm font-bold text-green-900">Contact Support</span>
             </button>
             
             <button 
               onClick={() => window.location.href = "/dashboard"}
-              className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-purple-50 hover:bg-purple-100 transition-colors group"
+              className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-purple-50 hover:bg-purple-100 transition-colors"
             >
-              <Rocket className="w-6 h-6 text-purple-600 group-hover:scale-110 transition-transform" />
+              <Rocket className="w-6 h-6 text-purple-600 transition-transform hover:scale-110" />
               <span className="text-sm font-bold text-purple-900">Go to Dashboard</span>
             </button>
           </motion.div>
@@ -383,10 +384,10 @@ useEffect(() => {
           <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-4 pt-4">
             <button
               onClick={() => window.location.href = "/services/check-your-ability/interview"}
-              className="flex-1 bg-[#1A1A1A] text-white font-black py-4 px-6 rounded-2xl hover:bg-black transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] flex items-center justify-center gap-2 group"
+              className="flex-1 bg-[#1A1A1A] text-white font-black py-4 px-6 rounded-2xl hover:bg-black transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] flex items-center justify-center gap-2"
             >
-              Start Your First Interview
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              <span>Start Your First Interview</span>
+              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
             </button>
             
             <button
@@ -415,33 +416,91 @@ useEffect(() => {
       
       {/* --- BACKGROUND DECORATION --- */}
       <div className="fixed inset-0 pointer-events-none -z-10">
-         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-100/40 rounded-full blur-[100px] mix-blend-multiply opacity-70 animate-blob" />
-         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-100/40 rounded-full blur-[100px] mix-blend-multiply opacity-70 animate-blob animation-delay-2000" />
-         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-pink-100/40 rounded-full blur-[100px] mix-blend-multiply opacity-70 animate-blob animation-delay-4000" />
+        <div 
+          className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-100/40 rounded-full blur-[100px] mix-blend-multiply opacity-70"
+          style={{ animation: 'blob 7s infinite' }}
+        />
+        <div 
+          className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-100/40 rounded-full blur-[100px] mix-blend-multiply opacity-70"
+          style={{ animation: 'blob 7s infinite 2s' }}
+        />
+        <div 
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-pink-100/40 rounded-full blur-[100px] mix-blend-multiply opacity-70"
+          style={{ animation: 'blob 7s infinite 4s' }}
+        />
       </div>
+
+      <style>
+        {`
+          @keyframes blob {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(30px, -50px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
+          }
+        `}
+      </style>
 
       <div className="max-w-7xl mx-auto px-6 py-12 md:py-20 space-y-16">
         
+        {/* --- TAB NAVIGATION --- */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex justify-center"
+        >
+          <div className="inline-flex gap-4 bg-white rounded-2xl p-1.5 border border-gray-200 shadow-md">
+            <button
+              onClick={() => setActiveTab('pricing')}
+              className={`px-6 py-3 rounded-xl font-bold text-sm transition-all ${
+                activeTab === 'pricing'
+                  ? 'bg-[#D4F478] text-black shadow-lg'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Pricing Plans
+            </button>
+            {currentPlan?.active && (
+              <button
+                onClick={() => setActiveTab('current-plan')}
+                className={`px-6 py-3 rounded-xl font-bold text-sm transition-all ${
+                  activeTab === 'current-plan'
+                    ? 'bg-[#D4F478] text-black shadow-lg'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Current Plan
+              </button>
+            )}
+          </div>
+        </motion.div>
+
         {/* --- HEADER --- */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center max-w-3xl mx-auto space-y-6"
         >
-           <div className="inline-flex items-center gap-2 bg-white border border-gray-200 px-4 py-1.5 rounded-full text-sm font-bold text-gray-600 shadow-sm mb-2">
-              <Lock className="w-3.5 h-3.5" /> Secure & Encrypted Payment
-           </div>
-           <h1 className="text-4xl md:text-6xl font-black text-gray-900 tracking-tight leading-[1.1]">
-             Invest in your <br className="hidden md:block" />
-             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">Future Today.</span>
-           </h1>
-           <p className="text-gray-500 text-lg md:text-xl font-medium max-w-xl mx-auto">
-             Unlock unlimited access to AI-powered interview prep and career-boosting tools.
-           </p>
+          <div className="inline-flex items-center gap-2 bg-white border border-gray-200 px-4 py-1.5 rounded-full text-sm font-bold text-gray-600 shadow-sm mb-2">
+            <Lock className="w-3.5 h-3.5" /> Secure & Encrypted Payment
+          </div>
+          <h1 className="text-4xl md:text-6xl font-black text-gray-900 tracking-tight leading-[1.1]">
+            {activeTab === 'pricing' ? (
+              <>Invest in your <br className="hidden md:block" />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">Future Today.</span></>
+            ) : (
+              <>Your <br className="hidden md:block" />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-emerald-600">Active Plan</span></>
+            )}
+          </h1>
+          <p className="text-gray-500 text-lg md:text-xl font-medium max-w-xl mx-auto">
+            {activeTab === 'pricing' 
+              ? 'Unlock unlimited access to AI-powered interview prep and career-boosting tools.' 
+              : 'Manage your subscription and track your remaining credits.'}
+          </p>
         </motion.div>
 
-        {/* ✅ REDESIGNED CURRENT PLAN - Much Clearer UI */}
-        {currentPlan?.active && (
+        {/* ✅ CURRENT PLAN TAB */}
+        {activeTab === 'current-plan' && currentPlan?.active && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -566,10 +625,10 @@ useEffect(() => {
                         You've used all your interview credits. Upgrade your plan to continue practicing!
                       </p>
                       <button 
-                        onClick={() => document.getElementById('pricing-cards')?.scrollIntoView({ behavior: 'smooth' })}
-                        className="bg-red-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-red-700 transition-colors flex items-center gap-2 group"
+                        onClick={() => setActiveTab('pricing')}
+                        className="bg-red-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-red-700 transition-colors flex items-center gap-2"
                       >
-                        <TrendingUp className="w-4 h-4 group-hover:translate-y-[-2px] transition-transform" />
+                        <TrendingUp className="w-4 h-4" />
                         Upgrade Now
                       </button>
                     </div>
@@ -593,10 +652,10 @@ useEffect(() => {
                         Only {currentPlan.interviewsRemaining} {currentPlan.interviewsRemaining === 1 ? 'credit' : 'credits'} left. Consider upgrading to keep practicing without interruption.
                       </p>
                       <button 
-                        onClick={() => document.getElementById('pricing-cards')?.scrollIntoView({ behavior: 'smooth' })}
-                        className="bg-orange-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-orange-700 transition-colors flex items-center gap-2 group"
+                        onClick={() => setActiveTab('pricing')}
+                        className="bg-orange-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-orange-700 transition-colors flex items-center gap-2"
                       >
-                        <TrendingUp className="w-4 h-4 group-hover:translate-y-[-2px] transition-transform" />
+                        <TrendingUp className="w-4 h-4" />
                         View Plans
                       </button>
                     </div>
@@ -627,123 +686,121 @@ useEffect(() => {
           </motion.div>
         )}
 
-        {/* --- PRICING CARDS --- */}
-        <motion.div 
-          id="pricing-cards"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start"
-        >
-          {plans.map((plan) => {
-            const Icon = plan.icon;
-            const isDark = plan.isRecommended;
-            const isCurrentPlan =
-  currentPlan?.active && currentPlan?.planId === plan.id;
-
-const hasCreditsRemaining =
-  isCurrentPlan && currentPlan.interviewsRemaining > 0;
-
-const disableButton = isCurrentPlan && hasCreditsRemaining;
-
-            
-            return (
-              <motion.div 
-                key={plan.id}
-                variants={cardVariants}
-                whileHover={{ y: -10 }}
-                className={`
-                  relative rounded-[2.5rem] p-8 md:p-10 transition-all duration-500 flex flex-col h-full
-                  ${isDark 
-                    ? 'bg-[#1A1A1A] text-white shadow-2xl shadow-gray-900/40 lg:scale-110 z-10 ring-1 ring-white/10' 
-                    : 'bg-white border border-gray-100 text-gray-900 shadow-xl shadow-gray-200/50 hover:border-gray-300'
-                  }
-                `}
-              >
-                {/* Popular Badge */}
-                {isDark && (
-                  <div className="absolute top-0 inset-x-0 flex justify-center -mt-4">
-                    <div className="bg-[#D4F478] text-black text-xs font-black px-6 py-2 rounded-full shadow-lg tracking-widest uppercase border-4 border-[#FDFBF9]">
-                      Most Popular
+        {/* ✅ PRICING CARDS TAB */}
+        {activeTab === 'pricing' && (
+          <motion.div 
+            id="pricing-cards"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start"
+          >
+            {plans.map((plan) => {
+              const Icon = plan.icon;
+              const isDark = plan.isRecommended;
+              const isCurrentPlan = currentPlan?.active && currentPlan?.planId === plan.id;
+              const hasCreditsRemaining = isCurrentPlan && currentPlan.interviewsRemaining > 0;
+              const disableButton = isCurrentPlan && hasCreditsRemaining;
+              
+              return (
+                <motion.div 
+                  key={plan.id}
+                  variants={cardVariants}
+                  whileHover={{ y: -10 }}
+                  className={`
+                    relative rounded-[2.5rem] p-8 md:p-10 transition-all duration-500 flex flex-col h-full
+                    ${isDark 
+                      ? 'bg-[#1A1A1A] text-white shadow-2xl shadow-gray-900/40 lg:scale-110 z-10 ring-1 ring-white/10' 
+                      : 'bg-white border border-gray-100 text-gray-900 shadow-xl shadow-gray-200/50 hover:border-gray-300'
+                    }
+                  `}
+                >
+                  {/* Popular Badge */}
+                  {isDark && (
+                    <div className="absolute top-0 inset-x-0 flex justify-center -mt-4">
+                      <div className="bg-[#D4F478] text-black text-xs font-black px-6 py-2 rounded-full shadow-lg tracking-widest uppercase border-4 border-[#FDFBF9]">
+                        Most Popular
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Card Header */}
-                <div className="mb-8">
-                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 shadow-sm ${plan.color}`}>
+                  {/* Card Header */}
+                  <div className="mb-8">
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 shadow-sm ${plan.color}`}>
                       <Icon className="w-7 h-7" />
-                   </div>
-                   <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-                   <p className={`text-sm font-medium mb-6 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                     {plan.description}
-                   </p>
-                   <div className="flex items-baseline gap-1">
+                    </div>
+                    <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
+                    <p className={`text-sm font-medium mb-6 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {plan.description}
+                    </p>
+                    <div className="flex items-baseline gap-1">
                       <span className="text-5xl font-black tracking-tight">{plan.price}</span>
                       <span className={`text-lg font-medium ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                         {plan.duration}
                       </span>
-                   </div>
-                </div>
+                    </div>
+                  </div>
 
-                {/* Divider */}
-                <div className={`h-px w-full mb-8 ${isDark ? 'bg-white/10' : 'bg-gray-100'}`} />
+                  {/* Divider */}
+                  <div className={`h-px w-full mb-8 ${isDark ? 'bg-white/10' : 'bg-gray-100'}`} />
 
-                {/* Features */}
-                <ul className="space-y-4 mb-8 flex-1">
-                   {plan.features.map((feature, idx) => (
-                     <li key={idx} className="flex items-start gap-3">
-                       <div className={`mt-0.5 rounded-full p-0.5 ${isDark ? 'bg-[#D4F478] text-black' : 'bg-green-100 text-green-600'}`}>
+                  {/* Features */}
+                  <ul className="space-y-4 mb-8 flex-1">
+                    {plan.features.map((feature, idx) => (
+                      <li key={idx} className="flex items-start gap-3">
+                        <div className={`mt-0.5 rounded-full p-0.5 ${isDark ? 'bg-[#D4F478] text-black' : 'bg-green-100 text-green-600'}`}>
                           <Check className="w-3 h-3" strokeWidth={4} />
-                       </div>
-                       <span className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{feature}</span>
-                     </li>
-                   ))}
-                </ul>
+                        </div>
+                        <span className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
 
-                {/* Action Button */}
-                <button
-  onClick={() => handlePlanSelect(plan.id)}
-  disabled={disableButton || (isProcessing && selectedPlan === plan.id)}
-  className={`
-    w-full py-4 rounded-2xl font-bold text-sm tracking-wide transition-all shadow-lg flex items-center justify-center gap-2
-    ${
-      disableButton
-        ? 'bg-green-100 text-green-700 cursor-not-allowed'
-        : isProcessing && selectedPlan === plan.id
-          ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
-          : isDark
-            ? 'bg-[#D4F478] text-black hover:bg-white hover:scale-[1.02]'
-            : 'bg-[#1A1A1A] text-white hover:bg-gray-800'
-    }
-  `}
->
-  {disableButton ? (
-    <>
-      <CheckCircle2 className="w-5 h-5" />
-      Current Plan
-    </>
-  ) : isProcessing && selectedPlan === plan.id ? (
-    <>Processing...</>
-  ) : (
-    <>
-      Choose {plan.name}
-      <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-    </>
-  )}
-</button>
-
-              </motion.div>
-            );
-          })}
-        </motion.div>
+                  {/* Action Button */}
+                  <button
+                    onClick={() => handlePlanSelect(plan.id)}
+                    disabled={disableButton || (isProcessing && selectedPlan === plan.id)}
+                    className={`
+                      w-full py-4 rounded-2xl font-bold text-sm tracking-wide transition-all shadow-lg flex items-center justify-center gap-2
+                      ${
+                        disableButton
+                          ? 'bg-green-100 text-green-700 cursor-not-allowed'
+                          : isProcessing && selectedPlan === plan.id
+                            ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                            : isDark
+                              ? 'bg-[#D4F478] text-black hover:bg-white hover:scale-[1.02]'
+                              : 'bg-[#1A1A1A] text-white hover:bg-gray-800'
+                      }
+                    `}
+                  >
+                    {disableButton ? (
+                      <>
+                        <CheckCircle2 className="w-5 h-5" />
+                        Current Plan
+                      </>
+                    ) : isProcessing && selectedPlan === plan.id ? (
+                      <>Processing...</>
+                    ) : (
+                      <>
+                        Choose {plan.name}
+                        <ArrowRight className="w-4 h-4 transition-transform hover:translate-x-1" />
+                      </>
+                    )}
+                  </button>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        )}
 
         {/* --- TRUST INDICATORS --- */}
-        <div className="flex flex-wrap justify-center gap-6 md:gap-12 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
-           <div className="flex items-center gap-2 font-bold text-gray-400"><ShieldCheck className="w-6 h-6" /> SSL Secure</div>
-           <div className="flex items-center gap-2 font-bold text-gray-400"><Globe className="w-6 h-6" /> Global Access</div>
-           <div className="flex items-center gap-2 font-bold text-gray-400"><Smartphone className="w-6 h-6" /> Mobile Ready</div>
-        </div>
+        {activeTab === 'pricing' && (
+          <div className="flex flex-wrap justify-center gap-6 md:gap-12 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+            <div className="flex items-center gap-2 font-bold text-gray-400"><ShieldCheck className="w-6 h-6" /> SSL Secure</div>
+            <div className="flex items-center gap-2 font-bold text-gray-400"><Globe className="w-6 h-6" /> Global Access</div>
+            <div className="flex items-center gap-2 font-bold text-gray-400"><Smartphone className="w-6 h-6" /> Mobile Ready</div>
+          </div>
+        )}
 
       </div>
     </div>

@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Twitter, Instagram, Linkedin, MapPin, Mail, Phone, ArrowRight } from "lucide-react";
 import TermsModal from "../components/TermsModal.jsx";
+import { useNavigate } from "react-router-dom";
+
 
 /* ================================
    SINGLE SOURCE OF TRUTH (SCALABLE)
@@ -28,6 +30,8 @@ function Footer() {
   const location = useLocation();
   const isHomePage = location.pathname === "/";
   const [openTerms, setOpenTerms] = useState(false);
+  const navigate = useNavigate();
+
 
   /* ================================
       HOME PAGE → BIG FOOTER (LIGHT UI)
@@ -85,10 +89,14 @@ function Footer() {
                   </a>
                 </li>
                 <li>
-                  <a href="#feedback" className="text-gray-600 hover:text-black transition-colors font-medium text-sm flex items-center gap-2 group">
-                    <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 -ml-6 group-hover:ml-0 transition-all" />
-                    Feedback
-                  </a>
+                  <button
+  onClick={() => navigate("/dashboard/feedback")}
+  className="text-gray-600 hover:text-black transition-colors font-medium text-sm flex items-center gap-2 group"
+>
+  <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 -ml-6 group-hover:ml-0 transition-all" />
+  Feedback
+</button>
+
                 </li>
                 <li>
                   <button 

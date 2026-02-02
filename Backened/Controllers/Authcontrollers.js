@@ -1,4 +1,5 @@
 import { User } from "../Models/User.js";
+import { Project } from "../Models/Project.js"; // Added this import
 import bcryptjs from "bcryptjs";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
@@ -11,6 +12,7 @@ import {
   sendPasswordResetEmail,
   sendResetSuccessEmail,
 } from "../mailtrap/emailsent.js";
+import { sendWelcomeNotification } from "../Utils/notificationHelper.js";
 
 export const checkAuth = async (req, res) => {
   try {
@@ -91,13 +93,17 @@ export const verifyEmail = async (req, res) => {
     await user.save();
 
     // ✅ LOGIN USER ONLY AFTER VERIFICATION
-    generateTokenAndSetCookie(res, user._id);
+    const token = generateTokenAndSetCookie(res, user._id);
 
     await sendWelcomeEmail(user.email, user.name);
+    
+    // ✅ SEND WELCOME NOTIFICATION
+    await sendWelcomeNotification(user._id, user.name);
 
     res.status(200).json({
       success: true,
       message: "Email verified successfully",
+      token: token,  // ✅ Return token to frontend for socket connection
       user: {
         ...user._doc,
         password: undefined,
@@ -131,13 +137,14 @@ export const login = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid credentials" });
     }
 
-    generateTokenAndSetCookie(res, user._id);
+    const token = generateTokenAndSetCookie(res, user._id);
     user.lastLogin = new Date();
     await user.save();
 
     res.status(200).json({
       success: true,
       message: "Logged in successfully",
+      token: token,  // ✅ Return token to frontend for socket connection
       user: { ...user._doc, password: undefined },
     });
   } catch (error) {
@@ -220,3 +227,50 @@ export const googleAuthCallback = async (req, res) => {
   }
 };
 
+/* ================= NEW PORTFOLIO LOGIC ================= */
+
+// GET ALL PORTFOLIO DATA
+export const getPortfolioData = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select("-password");
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    const projects = await Project.find({ userId: req.userId });
+
+    res.status(200).json({
+      success: true,
+      user: {
+        name: user.name,
+        bio: user.bio,
+        avatarUrl: user.avatarUrl,
+        location: user.location,
+      },
+      skills: user.courseProgress || [], 
+      interviews: user.interviewAttempts || [],
+      aptitude: user.aptitudeAttempts || [],
+      projects: projects || []
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ADD NEW PROJECT
+export const addProject = async (req, res) => {
+  try {
+    const { title, description, tags, imageUrl, liveLink, githubLink } = req.body;
+    const newProject = new Project({
+      userId: req.userId,
+      title,
+      description,
+      tags,
+      imageUrl,
+      liveLink,
+      githubLink
+    });
+    await newProject.save();
+    res.status(201).json({ success: true, project: newProject });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

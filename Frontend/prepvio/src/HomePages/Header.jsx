@@ -5,6 +5,8 @@ import { useAuthStore } from "../store/authstore";
 import { Link as ScrollLink } from "react-scroll";
 import { DashboardModal } from "../Dashboard/DashBoardPage";
 import { motion, AnimatePresence } from "framer-motion";
+import socket from "../socket";
+import { useNotificationStore } from "../store/notificationStore";
 
 import { 
   Menu, 
@@ -25,11 +27,12 @@ const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  
+  // ✅ SEARCH STATE
   const [search, setSearch] = useState("");
-const [showSuggestions, setShowSuggestions] = useState(false);
-const [courses, setCourses] = useState([]);
-
-
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [courses, setCourses] = useState([]);
 
   const { user, isAuthenticated, logout } = useAuthStore();
   const navigate = useNavigate();
@@ -37,18 +40,15 @@ const [courses, setCourses] = useState([]);
   const headerRef = useRef(null);
   const searchInputRef = useRef(null);
   const profileDropdownRef = useRef(null);
-
-  const searchSuggestions = [
-  ...(search.toLowerCase().includes("interview")
-    ? [{ label: "Interview Practice", path: "/services/check-your-ability" }]
-    : []),
-
-  ...(search.toLowerCase().includes("course") ||
-  search.toLowerCase().includes("learn")
-    ? [{ label: "Courses & Learning", path: "/services/learn--perform" }]
-    : []),
-];
-
+  
+  // ✅ USE STORE - Only recent notifications for bell icon
+  const {
+    recentNotifications,
+    unreadCount,
+    fetchRecentNotifications,
+    fetchUnreadCount,
+    markAsRead,
+  } = useNotificationStore();
 
   const getInitialsSeed = (fullName) => {
     if (!fullName) return "User";
@@ -56,51 +56,64 @@ const [courses, setCourses] = useState([]);
     return parts.length === 1 ? parts[0] : `${parts[0]} ${parts[parts.length - 1]}`;
   };
 
-  const filteredCourses = search.length === 0
-  ? courses
-  : courses.filter((course) => {
-      const name = course.name || course.title || "";
-      return name.toLowerCase().includes(search.toLowerCase());
-    });
-
-
-
-  useEffect(() => {
-  const fetchCourses = async () => {
-    try {
-      const res = await fetch("http://localhost:8000/api/courses");
-      const data = await res.json();
-
-      const list = Array.isArray(data)
-        ? data
-        : data.courses || data.data || [];
-
-      setCourses(list);
-    } catch (err) {
-      console.error("Header search courses fetch failed", err);
-    }
+  // ✅ INTERVIEW SEARCH ITEM (Always shown at top)
+  const INTERVIEW_SEARCH_ITEM = {
+    label: "Interview Practice",
+    description: "AI-powered mock interviews",
+    path: "/services/check-your-ability",
   };
 
-  fetchCourses();
-}, []);
+  // ✅ FILTER COURSES BASED ON SEARCH
+  const filteredCourses = search.length === 0
+    ? courses
+    : courses.filter((course) => {
+        const name = course.name || course.title || "";
+        return name.toLowerCase().includes(search.toLowerCase());
+      });
 
+  // ✅ FETCH COURSES ON MOUNT
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/courses");
+        const data = await res.json();
+
+        const list = Array.isArray(data)
+          ? data
+          : data.courses || data.data || [];
+
+        setCourses(list);
+      } catch (err) {
+        console.error("Header search courses fetch failed", err);
+      }
+    };
+
+    fetchCourses();
+  }, []);
+
+  // ✅ FETCH RECENT NOTIFICATIONS AND SETUP SOCKET
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchRecentNotifications();
+      fetchUnreadCount();
+    }
+  }, [isAuthenticated, fetchRecentNotifications, fetchUnreadCount]);
 
   // --- EFFECTS ---
   useEffect(() => {
-  const handleClickOutside = (event) => {
-    if (headerRef.current && !headerRef.current.contains(event.target)) {
-      setIsSearchVisible(false);
-      setShowSuggestions(false);
-      setSearch("");
-      setIsMobileMenuOpen(false);
-      setIsProfileDropdownOpen(false);
-    }
-  };
-
-  document.addEventListener("mousedown", handleClickOutside);
-  return () => document.removeEventListener("mousedown", handleClickOutside);
-}, []);
-
+    const handleClickOutside = (event) => {
+      if (headerRef.current && !headerRef.current.contains(event.target)) {
+        setIsSearchVisible(false);
+        setShowSuggestions(false);
+        setSearch("");
+        setIsMobileMenuOpen(false);
+        setIsProfileDropdownOpen(false);
+        setIsNotificationOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (isSearchVisible && searchInputRef.current) searchInputRef.current.focus();
@@ -114,20 +127,13 @@ const [courses, setCourses] = useState([]);
 
   // --- HANDLERS ---
   const handleSearchClick = (e) => {
-  e.preventDefault();
-  setIsSearchVisible(true);
-  setShowSuggestions(true); // 👈 THIS IS THE KEY
-};
-
-const INTERVIEW_SEARCH_ITEM = {
-  label: "Interview Practice",
-  description: "AI-powered mock interviews",
-  path: "/services/check-your-ability",
-};
-
+    e.preventDefault();
+    setIsSearchVisible(true);
+    setShowSuggestions(true); // 👈 Show suggestions immediately
+  };
 
   const handleMuteClick = () => setIsMuted(!isMuted);
-  const handleNotificationsClick = () => console.log("Notifications clicked!");
+  
   const handleProfileClick = () => setIsProfileDropdownOpen(!isProfileDropdownOpen);
   const handleDashboardClick = (e) => {
     e.preventDefault();
@@ -138,6 +144,21 @@ const INTERVIEW_SEARCH_ITEM = {
     await logout();
     setIsProfileDropdownOpen(false);
     navigate("/");
+  };
+
+  // ✅ NEW: Navigate to notifications tab in dashboard
+  const handleViewAllNotifications = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate('/dashboard/notifications');
+    setIsNotificationOpen(false);
+  };
+
+  // ✅ NEW: Handle individual notification click - mark as read and navigate
+  const handleNotificationClick = (notificationId) => {
+    markAsRead(notificationId);
+    navigate('/dashboard/notifications');
+    setIsNotificationOpen(false);
   };
 
   return (
@@ -176,7 +197,7 @@ const INTERVIEW_SEARCH_ITEM = {
 
           {/* 2. ADAPTED CENTER NAV (The "Pill") */}
           <div className="hidden md:flex items-center gap-8 text-sm font-bold text-gray-500 bg-white/60 backdrop-blur-md px-8 py-3 rounded-full border border-white shadow-lg shadow-gray-200/50">
-            <div className="relative flex items-center">
+            <div className="relative flex items-center" >
               <AnimatePresence mode="wait">
                 {isSearchVisible ? (
                   <motion.div 
@@ -186,29 +207,27 @@ const INTERVIEW_SEARCH_ITEM = {
                     className="flex items-center overflow-hidden"
                   >
                     <input
-  ref={searchInputRef}
-  type="text"
-  value={search}
-  onChange={(e) => {
-    setSearch(e.target.value);
-    setShowSuggestions(true);
-  }}
-  onBlur={() => {
-    setTimeout(() => setShowSuggestions(false), 150);
-  }}
-  placeholder="Search topics..."
-  className="w-40 bg-transparent border-none focus:ring-0 outline-none text-gray-900 placeholder-gray-400 text-xs"
-/>
-
+                      ref={searchInputRef}
+                      type="text"
+                      value={search}
+                      onChange={(e) => {
+                        setSearch(e.target.value);
+                        setShowSuggestions(true);
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => setShowSuggestions(false), 150);
+                      }}
+                      placeholder="Search topics..."
+                      className="w-40 bg-transparent border-none focus:ring-0 outline-none text-gray-900 placeholder-gray-400 text-xs"
+                    />
                     <button
-  onClick={() => {
-    setIsSearchVisible(false);
-    setSearch("");
-    setShowSuggestions(false);
-  }}
->
-
-                        <X className="w-3.5 h-3.5 text-gray-400 hover:text-black" />
+                      onClick={() => {
+                        setIsSearchVisible(false);
+                        setSearch("");
+                        setShowSuggestions(false);
+                      }}
+                    >
+                      <X className="w-3.5 h-3.5 text-gray-400 hover:text-black" />
                     </button>
                   </motion.div>
                 ) : (
@@ -223,73 +242,71 @@ const INTERVIEW_SEARCH_ITEM = {
                 )}
               </AnimatePresence>
 
+              {/* ✅ SEARCH SUGGESTIONS DROPDOWN */}
               <AnimatePresence>
-  {showSuggestions && (
-    <motion.div
-      initial={{ opacity: 0, y: -6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -6 }}
-      className="absolute top-full mt-3 w-56 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden"
-    >
-    {/* 🔹 INTERVIEW (ALWAYS ON TOP) */}
-<button
+                {showSuggestions && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    className="absolute top-full mt-3 w-56 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden"
+                  >
+                    {/* 🔹 INTERVIEW (ALWAYS ON TOP) */}
+                    <button
   onClick={() => {
     setShowSuggestions(false);
     setSearch("");
+    setIsSearchVisible(false);
+
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+
     navigate(INTERVIEW_SEARCH_ITEM.path);
   }}
-  className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
->
-  <div className="text-sm font-bold text-gray-900">
-    {INTERVIEW_SEARCH_ITEM.label}
-  </div>
-  <div className="text-xs text-gray-500">
-    {INTERVIEW_SEARCH_ITEM.description}
-  </div>
-</button>
 
-{/* 🔹 COURSES */}
-{filteredCourses.length === 0 ? (
-  <div className="px-4 py-3 text-xs text-gray-400">
-    No courses found
-  </div>
-) : (
-  filteredCourses.slice(0, 6).map((course) => (
-    <button
-      key={course._id}
-      onClick={() => {
-        setShowSuggestions(false);
-        setSearch("");
-        navigate(`/services/learn-and-perform/${course._id}`);
-      }}
-      className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-    >
-      {course.name || course.title}
-    </button>
-  ))
-)}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
+                    >
+                      <div className="text-sm font-bold text-gray-900">
+                        {INTERVIEW_SEARCH_ITEM.label}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {INTERVIEW_SEARCH_ITEM.description}
+                      </div>
+                    </button>
 
-      
+                    {/* 🔹 COURSES */}
+                    {filteredCourses.length === 0 ? (
+                      <div className="px-4 py-3 text-xs text-gray-400">
+                        No courses found
+                      </div>
+                    ) : (
+                      filteredCourses.slice(0, 5).map((course) => (
+                        <button
+  key={course._id}
+  onClick={() => {
+    setShowSuggestions(false);
+    setSearch("");
+    setIsSearchVisible(false);
 
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
 
-      {/* {filteredCourses.slice(0, 6).map((course) => (
-  <button
-    key={course._id}
-    onClick={() => {
-      setShowSuggestions(false);
-      setSearch("");
-      navigate(`/services/learn-and-perform/${course._id}`);
-    }}
-    className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-  >
-    {course.name || course.title}
-  </button>
-))} */}
+    navigate(`/services/learn-and-perform/${course._id}`);
+  }}
 
-    </motion.div>
-  )}
-</AnimatePresence>
-
+                          className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          {course.name || course.title}
+                        </button>
+                      ))
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             <div className="h-4 w-px bg-gray-200"></div>
@@ -308,9 +325,96 @@ const INTERVIEW_SEARCH_ITEM = {
               <button onClick={handleMuteClick} className="hover:text-black transition-colors">
                 {isMuted ? <VolumeX className="w-4.5 h-4.5" /> : <Volume2 className="w-4.5 h-4.5" />}
               </button>
-              <button onClick={handleNotificationsClick} className="hover:text-black transition-colors">
-                <Bell className="w-4.5 h-4.5" />
-              </button>
+              
+              {/* ✅ NOTIFICATION BELL ICON */}
+              <div className="relative">
+                <button
+                  onClick={async () => {
+                    if (isAuthenticated) {
+                      setIsNotificationOpen(!isNotificationOpen);
+                      if (!isNotificationOpen) {
+                        await fetchRecentNotifications();
+                      }
+                    }
+                  }}
+                  className="relative hover:text-black transition-colors"
+                >
+                  <Bell className="w-4.5 h-4.5" />
+
+                  {isAuthenticated && unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* ✅ NOTIFICATION DROPDOWN - ONLY SHOW IF AUTHENTICATED */}
+                {isAuthenticated && isNotificationOpen && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute right-0 mt-4 w-80 bg-white rounded-xl shadow-2xl z-50 overflow-hidden border border-gray-100"
+                  >
+                    {/* Header */}
+                    <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+                      <span className="text-sm font-bold text-gray-900">Recent Notifications</span>
+                      {recentNotifications.length > 0 && (
+                        <button 
+                          onClick={handleViewAllNotifications}
+                          className="text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors"
+                        >
+                          View All
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Notifications List */}
+                    {recentNotifications.length === 0 ? (
+                      <div className="p-6 text-center">
+                        <Bell className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                        <p className="text-sm text-gray-500">No recent notifications</p>
+                      </div>
+                    ) : (
+                      <div className="max-h-96 overflow-y-auto">
+                        {recentNotifications.map((n) => (
+                          <div
+                            key={n._id}
+                            onClick={() => handleNotificationClick(n._id)}
+                            className={`px-4 py-3 cursor-pointer hover:bg-gray-50 border-b border-gray-50 last:border-b-0 transition-colors ${
+                              n.isRead ? "bg-white" : "bg-blue-50/50"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <p className={`flex-1 text-sm ${n.isRead ? "text-gray-600" : "font-bold text-gray-900"}`}>
+                                {n.message}
+                              </p>
+                              {!n.isRead && (
+                                <span className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 flex-shrink-0"></span>
+                              )}
+                            </div>
+                            <span className="text-xs text-gray-400 mt-1 block">
+                              {new Date(n.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Footer */}
+                    {recentNotifications.length > 0 && (
+                      <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
+                        <button
+                          onClick={handleViewAllNotifications}
+                          className="text-xs font-bold text-gray-700 hover:text-gray-900 w-full text-center transition-colors"
+                        >
+                          See all notifications in Dashboard →
+                        </button>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -412,1015 +516,3 @@ const INTERVIEW_SEARCH_ITEM = {
 };
 
 export default Header;
-
-
-// //Backup code hai jab upar wala nahi chale to  src/components/Header.js
-// import React, { useState, useRef, useEffect } from "react";
-// import { Link, useNavigate } from "react-router-dom";
-// import { useAuthStore } from "../store/authstore";
-// import { Link as ScrollLink } from "react-scroll";
-// import { DashboardModal } from "../Dashboard/DashBoardPage";
-
-// const Header = () => {
-//   const [isMuted, setIsMuted] = useState(false);
-//   const [isSearchVisible, setIsSearchVisible] = useState(false);
-//   const [isScrolled, setIsScrolled] = useState(false);
-//   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-//   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
-//   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
-
-//   const { user, isAuthenticated, logout } = useAuthStore();
-//   const navigate = useNavigate();
-
-//   const headerRef = useRef(null);
-//   const searchInputRef = useRef(null);
-//   const profileDropdownRef = useRef(null);
-
-//   const getInitialsSeed = (fullName) => {
-//     if (!fullName) return "User";
-//     const parts = fullName.trim().split(" ");
-//     if (parts.length === 1) return parts[0];
-//     return `${parts[0]} ${parts[parts.length - 1]}`;
-//   };
-
-//   // Close menus when clicking outside
-//   useEffect(() => {
-//     const handleClickOutside = (event) => {
-//       if (headerRef.current && !headerRef.current.contains(event.target)) {
-//         setIsSearchVisible(false);
-//         setIsMobileMenuOpen(false);
-//         setIsProfileDropdownOpen(false);
-//       }
-//     };
-//     document.addEventListener("mousedown", handleClickOutside);
-//     return () => document.removeEventListener("mousedown", handleClickOutside);
-//   }, []);
-
-//   // Focus search input when opened
-//   useEffect(() => {
-//     if (isSearchVisible && searchInputRef.current) {
-//       searchInputRef.current.focus();
-//     }
-//   }, [isSearchVisible]);
-
-//   // Detect scroll
-//   useEffect(() => {
-//     const handleScroll = () => setIsScrolled(window.scrollY > 10);
-//     window.addEventListener("scroll", handleScroll);
-//     return () => window.removeEventListener("scroll", handleScroll);
-//   }, []);
-
-//   const handleSearchClick = (e) => {
-//     e.preventDefault();
-//     setIsSearchVisible(true);
-//   };
-
-//   const handleMuteClick = () => setIsMuted(!isMuted);
-//   const handleNotificationsClick = () => console.log("Notifications clicked!");
-//   const handleProfileClick = () => setIsProfileDropdownOpen(!isProfileDropdownOpen);
-
-//   const handleDashboardClick = (e) => {
-//     e.preventDefault();
-//     setIsDashboardOpen(true);
-//     setIsProfileDropdownOpen(false);
-//   };
-
-//   const handleLogout = async () => {
-//     await logout();
-//     setIsProfileDropdownOpen(false);
-//     navigate("/");
-//   };
-
-//   return (
-//     <>
-//       <header
-//         ref={headerRef}
-//         className={`font-aquire flex justify-center transition-all duration-300 z-50 ${
-//           isScrolled ? "fixed top-0 left-0 w-full" : "sticky top-4"
-//         }`}
-//       >
-//         <div
-//           className={`${
-//             isScrolled
-//               ? "w-full rounded-none px-6 md:px-20"
-//               : "w-[95%] sm:w-[90%] md:w-[85%] lg:w-[80%] xl:w-[75%] 2xl:w-[70%] rounded-full"
-//           } bg-white/20 backdrop-blur-lg border border-white/10 shadow-lg px-6 h-16 flex items-center justify-between transition-all duration-300 text-black`}
-//           style={{ textShadow: "1px 1px 2px rgba(0,0,0,0.15)" }}
-//         >
-//           <div className="flex flex-1 items-center justify-between">
-//             {/* Logo */}
-//             <div className="flex items-center gap-3">
-//               <img className="h-12 rounded-lg" src="swaroop.png" alt="LOGO" />
-//             </div>
-
-//             {/* Desktop Navigation */}
-//             <nav className="hidden md:flex items-center space-x-6">
-//               {/* Search */}
-//               <div className="relative">
-//                 {!isSearchVisible ? (
-//                   <a
-//                     href="#"
-//                     className="hover:text-gray-800 font-devator"
-//                     onClick={handleSearchClick}
-//                   >
-//                     Search
-//                   </a>
-//                 ) : (
-//                   <input
-//                     ref={searchInputRef}
-//                     type="text"
-//                     placeholder="Search..."
-//                     className={`px-4 py-2 rounded-lg bg-white/20 text-black placeholder-black/70 focus:outline-none focus:ring-1 focus:ring-black transition-all duration-300 ease-in-out ${
-//                       isScrolled ? "w-72" : "w-56"
-//                     }`}
-//                     style={{ textShadow: "1px 1px 2px rgba(0,0,0,0.15)" }}
-//                   />
-//                 )}
-//               </div>
-
-//               {/* Links */}
-//               <ScrollLink
-//                 to="about"
-//                 smooth={true}
-//                 duration={600}
-//                 offset={-80}
-//                 className="cursor-pointer hover:text-gray-800"
-//               >
-//                 About
-//               </ScrollLink>
-//               <ScrollLink
-//                 to="explore"
-//                 smooth={true}
-//                 duration={600}
-//                 offset={-80}
-//                 className="cursor-pointer hover:text-gray-800"
-//               >
-//                 Explore
-//               </ScrollLink>
-
-//               {/* Mute Button */}
-//               <button onClick={handleMuteClick} className="hover:text-gray-800">
-//                 {isMuted ? "Unmute" : "Mute"}
-//               </button>
-
-//               {/* Notifications */}
-//               <button
-//                 onClick={handleNotificationsClick}
-//                 className="flex items-center hover:text-gray-800"
-//               >
-//                 <svg
-//                   xmlns="http://www.w3.org/2000/svg"
-//                   className="h-5 w-5"
-//                   fill="none"
-//                   viewBox="0 0 24 24"
-//                   stroke="currentColor"
-//                 >
-//                   <path
-//                     strokeLinecap="round"
-//                     strokeLinejoin="round"
-//                     strokeWidth={2}
-//                     d="M15 17h5l-1.405-1.405C17.653 14.894 17 13.985 17 12V9c0-3.313-2.687-6-6-6S5 5.687 5 9v3c0 1.985-.653 2.894-1.595 3.595L2 17h5m5 0v3a2 2 0 01-2 2H9a2 2 0 01-2-2v-3"
-//                   />
-//                 </svg>
-//               </button>
-
-//               {/* Profile / Auth */}
-//               {isAuthenticated ? (
-//                 <div className="relative" ref={profileDropdownRef}>
-//                   <div
-//                     className="flex items-center space-x-2 cursor-pointer"
-//                     onClick={handleProfileClick}
-//                   >
-//                     <img
-//                       src={
-//                         user?.profilePic ||
-//                         `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
-//                           getInitialsSeed(user?.name)
-//                         )}`
-//                       }
-//                       alt={user?.name || "User"}
-//                       className="h-10 w-10 rounded-full object-cover"
-//                     />
-//                     <span className="font-medium">{user?.name}</span>
-//                   </div>
-
-//                   {isProfileDropdownOpen && (
-//                     <div className="absolute right-0 mt-2 w-48 bg-white/20 backdrop-blur-md border border-white/10 rounded-md shadow-lg z-50">
-//                       <div className="py-1">
-//                         <button
-//                           onClick={handleDashboardClick}
-//                           className="w-full text-left px-4 py-2 hover:bg-white/10"
-//                         >
-//                           Dashboard
-//                         </button>
-//                         <button
-//                           onClick={handleLogout}
-//                           className="w-full text-left px-4 py-2 hover:bg-white/10"
-//                         >
-//                           Logout
-//                         </button>
-//                       </div>
-//                     </div>
-//                   )}
-//                 </div>
-//               ) : (
-//                 <>
-//                   <Link to="/login" className="hover:text-gray-800">
-//                     Login
-//                   </Link>
-//                   <Link
-//                     to="/signup"
-//                     className="px-6 py-2 rounded-full font-aquire font-bold 
-//              bg-black text-white transition-all duration-300 
-//              hover:bg-white/20 hover:text-black hover:backdrop-blur-sm"
-//                   >
-//                     Get Started
-//                   </Link>
-//                 </>
-//               )}
-//             </nav>
-
-//             {/* Mobile Hamburger */}
-//             <button
-//               className="md:hidden flex items-center justify-center"
-//               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-//             >
-//               {isMobileMenuOpen ? (
-//                 <svg
-//                   className="w-6 h-6"
-//                   fill="none"
-//                   stroke="currentColor"
-//                   viewBox="0 0 24 24"
-//                 >
-//                   <path
-//                     strokeLinecap="round"
-//                     strokeLinejoin="round"
-//                     strokeWidth={2}
-//                     d="M6 18L18 6M6 6l12 12"
-//                   />
-//                 </svg>
-//               ) : (
-//                 <svg
-//                   className="w-6 h-6"
-//                   fill="none"
-//                   stroke="currentColor"
-//                   viewBox="0 0 24 24"
-//                 >
-//                   <path
-//                     strokeLinecap="round"
-//                     strokeLinejoin="round"
-//                     strokeWidth={2}
-//                     d="M4 6h16M4 12h16M4 18h16"
-//                   />
-//                 </svg>
-//               )}
-//             </button>
-//           </div>
-//         </div>
-//       </header>
-
-//       {/* Dashboard Modal */}
-//       {isDashboardOpen && (
-//         <DashboardModal onClose={() => setIsDashboardOpen(false)} />
-//       )}
-//     </>
-//   );
-// };
-
-// export default Header;
-
-
-
-
-
-// // src/components/Header.js
-// import React, { useState, useRef, useEffect } from "react";
-// import { Link, useNavigate } from "react-router-dom";
-// import { useAuthStore } from "../store/authstore";
-// import { Link as ScrollLink } from "react-scroll";
-
-// const Header = () => {
-//   const [isMuted, setIsMuted] = useState(false);
-//   const [isSearchVisible, setIsSearchVisible] = useState(false);
-//   const [isScrolled, setIsScrolled] = useState(false);
-//   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-//   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
-
-//   const { user, isAuthenticated, logout } = useAuthStore();
-//   const navigate = useNavigate();
-
-//   const headerRef = useRef(null);
-//   const searchInputRef = useRef(null);
-//   const profileDropdownRef = useRef(null);
-
-//   // ✅ Fix template string for initials
-//   const getInitialsSeed = (fullName) => {
-//     if (!fullName) return "User";
-//     const parts = fullName.trim().split(" ");
-//     if (parts.length === 1) return parts[0];
-//     return `${parts[0]} ${parts[parts.length - 1]}`;
-//   };
-
-//   // Close menus when clicking outside
-//   useEffect(() => {
-//     const handleClickOutside = (event) => {
-//       if (headerRef.current && !headerRef.current.contains(event.target)) {
-//         setIsSearchVisible(false);
-//         setIsMobileMenuOpen(false);
-//         setIsProfileDropdownOpen(false);
-//       }
-//     };
-//     document.addEventListener("mousedown", handleClickOutside);
-//     return () => document.removeEventListener("mousedown", handleClickOutside);
-//   }, []);
-
-//   // Focus search input when opened
-//   useEffect(() => {
-//     if (isSearchVisible && searchInputRef.current) {
-//       searchInputRef.current.focus();
-//     }
-//   }, [isSearchVisible]);
-
-//   // Detect scroll
-//   useEffect(() => {
-//     const handleScroll = () => setIsScrolled(window.scrollY > 10);
-//     window.addEventListener("scroll", handleScroll);
-//     return () => window.removeEventListener("scroll", handleScroll);
-//   }, []);
-
-//   const handleSearchClick = (e) => {
-//     e.preventDefault();
-//     setIsSearchVisible(true);
-//   };
-
-//   const handleMuteClick = () => setIsMuted(!isMuted);
-//   const handleNotificationsClick = () => console.log("Notifications clicked!");
-//   const handleProfileClick = () => setIsProfileDropdownOpen(!isProfileDropdownOpen);
-
-//   const handleLogout = async () => {
-//     await logout();
-//     setIsProfileDropdownOpen(false);
-//     navigate("/");
-//   };
-
-//   return (
-//     <>
-//       <header
-//         ref={headerRef}
-//         className={`font-aquire flex justify-center transition-all duration-300 z-50 ${
-//           isScrolled ? "fixed top-0 left-0 w-full" : "sticky top-4"
-//         }`}
-//       >
-//         <div
-//           className={`${
-//             isScrolled
-//               ? "w-full rounded-none px-6 md:px-20"
-//               : "w-[95%] sm:w-[90%] md:w-[85%] lg:w-[80%] xl:w-[75%] 2xl:w-[70%] rounded-full"
-//           } bg-white/20 backdrop-blur-lg border border-white/10 shadow-lg px-6 h-16 flex items-center justify-between transition-all duration-300 text-black`}
-//           style={{ textShadow: "1px 1px 2px rgba(0,0,0,0.15)" }}
-//         >
-//           {/* Centered wrapper */}
-//           <div className="flex flex-1 items-center justify-between">
-//             {/* Logo */}
-//             <div className="flex items-center gap-3">
-//               <img className="h-12 rounded-lg" src="swaroop.png" alt="LOGO" />
-//             </div>
-
-//             {/* Desktop Navigation */}
-//             <nav className="hidden md:flex items-center space-x-6">
-//               {/* Search */}
-//               <div className="relative">
-//                 {!isSearchVisible ? (
-//                   <a
-//                     href="#"
-//                     className="hover:text-gray-800 font-devator"
-//                     onClick={handleSearchClick}
-//                   >
-//                     Search
-//                   </a>
-//                 ) : (
-//                   <input
-//                     ref={searchInputRef}
-//                     type="text"
-//                     placeholder="Search..."
-//                     className={`px-4 py-2 rounded-lg bg-white/20 text-black placeholder-black/70 focus:outline-none focus:ring-1 focus:ring-black transition-all duration-300 ease-in-out ${
-//                       isScrolled ? "w-72" : "w-56"
-//                     }`}
-//                     style={{ textShadow: "1px 1px 2px rgba(0,0,0,0.15)" }}
-//                   />
-//                 )}
-//               </div>
-
-//               {/* Links */}
-//               <ScrollLink
-//                 to="about"
-//                 smooth={true}
-//                 duration={600}
-//                 offset={-80}
-//                 className="cursor-pointer hover:text-gray-800"
-//               >
-//                 About
-//               </ScrollLink>
-//               <ScrollLink
-//                 to="explore"
-//                 smooth={true}
-//                 duration={600}
-//                 offset={-80}
-//                 className="cursor-pointer hover:text-gray-800"
-//               >
-//                 Explore
-//               </ScrollLink>
-
-//               {/* Mute Button */}
-//               <button onClick={handleMuteClick} className="hover:text-gray-800">
-//                 {isMuted ? "Unmute" : "Mute"}
-//               </button>
-
-//               {/* Notifications */}
-//               <button
-//                 onClick={handleNotificationsClick}
-//                 className="flex items-center hover:text-gray-800"
-//               >
-//                 <svg
-//                   xmlns="http://www.w3.org/2000/svg"
-//                   className="h-5 w-5"
-//                   fill="none"
-//                   viewBox="0 0 24 24"
-//                   stroke="currentColor"
-//                 >
-//                   <path
-//                     strokeLinecap="round"
-//                     strokeLinejoin="round"
-//                     strokeWidth={2}
-//                     d="M15 17h5l-1.405-1.405C17.653 14.894 17 13.985 17 12V9c0-3.313-2.687-6-6-6S5 5.687 5 9v3c0 1.985-.653 2.894-1.595 3.595L2 17h5m5 0v3a2 2 0 01-2 2H9a2 2 0 01-2-2v-3"
-//                   />
-//                 </svg>
-//               </button>
-
-//               {/* Profile / Auth */}
-//               {isAuthenticated ? (
-//                 <div className="relative" ref={profileDropdownRef}>
-//                   <div
-//                     className="flex items-center space-x-2 cursor-pointer"
-//                     onClick={handleProfileClick}
-//                   >
-//                     <img
-//                       src={
-//                         user?.profilePic ||
-//                         `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
-//                           getInitialsSeed(user?.name)
-//                         )}`
-//                       }
-//                       alt={user?.name || "User"}
-//                       className="h-10 w-10 rounded-full object-cover"
-//                     />
-//                     <span className="font-medium">{user?.name}</span>
-//                   </div>
-
-//                   {isProfileDropdownOpen && (
-//                     <div className="absolute right-0 mt-2 w-48 bg-white/20 backdrop-blur-md border border-white/10 rounded-md shadow-lg z-50">
-//                       <div className="py-1">
-//                         <Link
-//                           to="/dashboard"
-//                           className="block px-4 py-2 hover:bg-white/10"
-//                           onClick={() => setIsProfileDropdownOpen(false)}
-//                         >
-//                           Dashboard
-//                         </Link>
-//                         <button
-//                           onClick={handleLogout}
-//                           className="w-full text-left px-4 py-2 hover:bg-white/10"
-//                         >
-//                           Logout
-//                         </button>
-//                       </div>
-//                     </div>
-//                   )}
-//                 </div>
-//               ) : (
-//                 <>
-//                   <Link to="/login" className="hover:text-gray-800">
-//                     Login
-//                   </Link>
-//                   <Link
-//                     to="/signup"
-//                     className="px-6 py-2 rounded-full font-aquire font-bold 
-//              bg-black text-white transition-all duration-300 
-//              hover:bg-white/20 hover:text-black hover:backdrop-blur-sm"
-//                   >
-//                     Get Started
-//                   </Link>
-//                 </>
-//               )}
-//             </nav>
-
-//             {/* Mobile Hamburger */}
-//             <button
-//               className="md:hidden flex items-center justify-center"
-//               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-//             >
-//               {isMobileMenuOpen ? (
-//                 <svg
-//                   className="w-6 h-6"
-//                   fill="none"
-//                   stroke="currentColor"
-//                   viewBox="0 0 24 24"
-//                 >
-//                   <path
-//                     strokeLinecap="round"
-//                     strokeLinejoin="round"
-//                     strokeWidth={2}
-//                     d="M6 18L18 6M6 6l12 12"
-//                   />
-//                 </svg>
-//               ) : (
-//                 <svg
-//                   className="w-6 h-6"
-//                   fill="none"
-//                   stroke="currentColor"
-//                   viewBox="0 0 24 24"
-//                 >
-//                   <path
-//                     strokeLinecap="round"
-//                     strokeLinejoin="round"
-//                     strokeWidth={2}
-//                     d="M4 6h16M4 12h16M4 18h16"
-//                   />
-//                 </svg>
-//               )}
-//             </button>
-//           </div>
-//         </div>
-//       </header>
-//     </>
-//   );
-// };
-
-// export default Header;
-
-
-
-
-
-
-
-
-
-
-
-// DUSRA HAI  src/components/Header.js
-// import React, { useState, useRef, useEffect } from "react";
-// import { Link, useNavigate } from "react-router-dom";
-// import { useAuthStore } from "../store/authstore"; // 👈 import your auth store
-
-// const Header = () => {
-//   const [isMuted, setIsMuted] = useState(false);
-//   const [isSearchVisible, setIsSearchVisible] = useState(false);
-//   const [isScrolled, setIsScrolled] = useState(false);
-//   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-//   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
-
-//   const { user, isAuthenticated, logout } = useAuthStore(); // Zustand state
-//   const navigate = useNavigate();
-
-//   const headerRef = useRef(null);
-//   const searchInputRef = useRef(null);
-//   const profileDropdownRef = useRef(null);
-
-//   // Click outside to close menus
-//   useEffect(() => {
-//     const handleClickOutside = (event) => {
-//       if (headerRef.current && !headerRef.current.contains(event.target)) {
-//         setIsSearchVisible(false);
-//         setIsMobileMenuOpen(false);
-//         setIsProfileDropdownOpen(false);
-//       }
-//     };
-//     document.addEventListener("mousedown", handleClickOutside);
-//     return () => document.removeEventListener("mousedown", handleClickOutside);
-//   }, []);
-
-//   // Auto-focus search input
-//   useEffect(() => {
-//     if (isSearchVisible && searchInputRef.current) {
-//       searchInputRef.current.focus();
-//     }
-//   }, [isSearchVisible]);
-
-//   // Detect scroll
-//   useEffect(() => {
-//     const handleScroll = () => setIsScrolled(window.scrollY > 10);
-//     window.addEventListener("scroll", handleScroll);
-//     return () => window.removeEventListener("scroll", handleScroll);
-//   }, []);
-
-//   // Handlers
-//   const handleSearchClick = (e) => {
-//     e.preventDefault();
-//     setIsSearchVisible(true);
-//   };
-//   const handleMuteClick = () => setIsMuted(!isMuted);
-//   const handleNotificationsClick = () => console.log("Notifications clicked!");
-//   const handleProfileClick = () => setIsProfileDropdownOpen(!isProfileDropdownOpen);
-
-//   const handleLogout = async () => {
-//     await logout();
-//     setIsProfileDropdownOpen(false);
-//     navigate("/"); // redirect home
-//   };
-
-//   return (
-//     <>
-//       <header
-//         ref={headerRef}
-//         className={`flex justify-center transition-all duration-300 z-50 ${
-//           isScrolled ? "fixed top-0 left-0 w-full" : "sticky top-4"
-//         }`}
-//       >
-//         <div
-//           className={`${
-//             isScrolled
-//               ? "w-full rounded-none px-6 md:px-20"
-//               : "w-[90%] md:w-[75%] lg:w-[85%] xl:w-[60%] rounded-full"
-//           } bg-white bg-opacity-90 backdrop-blur-lg border border-gray-200 shadow-md px-6 h-16 flex justify-between items-center transition-all duration-300`}
-//         >
-//           {/* Logo */}
-//           <div className="flex flex-row items-center gap-3">
-//             <img className="h-12 rounded-lg" src="logo final-Photoroom.png" alt="LOGO" />
-//             <h1 className="font-bold text-2xl">Prepvio</h1>
-//           </div>
-
-//           {/* Desktop Navigation */}
-//           <nav className="hidden md:flex items-center space-x-6">
-//             <div className="relative">
-//               {!isSearchVisible ? (
-//                 <a
-//                   href="#"
-//                   className="text-gray-600 hover:text-gray-900"
-//                   onClick={handleSearchClick}
-//                 >
-//                   Search
-//                 </a>
-//               ) : (
-//                 <input
-//                   ref={searchInputRef}
-//                   type="text"
-//                   placeholder="Search..."
-//                   className={`px-4 py-2 rounded-lg focus:outline-none 
-//                     focus:ring-1 focus:ring-ring-100 transition-all duration-300 ease-in-out ${
-//                       isScrolled ? "w-72" : "w-48"
-//                     }`}
-//                 />
-//               )}
-//             </div>
-
-//             <a href="#" className="text-gray-600 hover:text-gray-900">About</a>
-//             <a href="#" className="text-gray-600 hover:text-gray-900">Explore</a>
-
-//             <button onClick={handleMuteClick} className="text-gray-600 hover:text-gray-900">
-//               {isMuted ? "Unmute" : "Mute"}
-//             </button>
-
-//             <button
-//               onClick={handleNotificationsClick}
-//               className="flex items-center text-gray-600 hover:text-gray-900"
-//             >
-//               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-//                   d="M15 17h5l-1.405-1.405C17.653 14.894 
-//                   17 13.985 17 12V9c0-3.313-2.687-6-6-6S5 
-//                   5.687 5 9v3c0 1.985-.653 2.894-1.595 
-//                   3.595L2 17h5m5 0v3a2 2 0 01-2 
-//                   2H9a2 2 0 01-2-2v-3" />
-//               </svg>
-//             </button>
-
-//             {/* 👇 Conditional Rendering */}
-//             {isAuthenticated ? (
-//               <div className="relative" ref={profileDropdownRef}>
-//                 <div
-//                   className="flex items-center space-x-2 cursor-pointer"
-//                   onClick={handleProfileClick}
-//                 >
-//                   <img
-//                     src={user?.profilePic || "https://via.placeholder.com/150"}
-//                     alt={user?.name || "User"}
-//                     className="h-10 w-10 rounded-full object-cover"
-//                   />
-//                   <span className="font-medium text-gray-800">{user?.name}</span>
-//                 </div>
-//                 {isProfileDropdownOpen && (
-//                   <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50">
-//                     <div className="py-1">
-//                       <Link
-//                         to="/dashboard"
-//                         className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
-//                         onClick={() => setIsProfileDropdownOpen(false)}
-//                       >
-//                         Dashboard
-//                       </Link>
-//                       <button
-//                         onClick={handleLogout}
-//                         className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100"
-//                       >
-//                         Logout
-//                       </button>
-//                     </div>
-//                   </div>
-//                 )}
-//               </div>
-//             ) : (
-//               <>
-//                 <Link to="/login" className="text-gray-600 hover:text-gray-900">
-//                   Login
-//                 </Link>
-//                 <Link
-//                   to="/signup"
-//                   className="bg-gray-900 text-white px-6 py-2 rounded-full font-medium hover:bg-gray-800"
-//                 >
-//                   Get Started
-//                 </Link>
-//               </>
-//             )}
-//           </nav>
-
-//           {/* Mobile Hamburger */}
-//           <button
-//             className="md:hidden flex items-center justify-center text-gray-700"
-//             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-//           >
-//             {isMobileMenuOpen ? (
-//               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-//               </svg>
-//             ) : (
-//               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-//               </svg>
-//             )}
-//           </button>
-//         </div>
-//       </header>
-
-//       {/* Mobile Menu Dropdown */}
-//       {isMobileMenuOpen && (
-//         <div className="md:hidden bg-white border-t border-gray-200 shadow-md px-6 py-4 space-y-4">
-//           <a href="#" className="block text-gray-600 hover:text-gray-900">About</a>
-//           <a href="#" className="block text-gray-600 hover:text-gray-900">Explore</a>
-//           <button onClick={handleMuteClick} className="block text-gray-600 hover:text-gray-900">
-//             {isMuted ? "Unmute" : "Mute"}
-//           </button>
-//           <button
-//             onClick={handleNotificationsClick}
-//             className="block text-gray-600 hover:text-gray-900"
-//           >
-//             Notifications
-//           </button>
-
-//           {isAuthenticated ? (
-//             <>
-//               <Link
-//                 to="/dashboard"
-//                 className="block text-gray-600 hover:text-gray-900"
-//                 onClick={() => setIsMobileMenuOpen(false)}
-//               >
-//                 Dashboard
-//               </Link>
-//               <button
-//                 onClick={handleLogout}
-//                 className="w-full block text-center bg-gray-900 text-white px-6 py-2 rounded-full font-medium hover:bg-gray-800"
-//               >
-//                 Logout
-//               </button>
-//             </>
-//           ) : (
-//             <>
-//               <Link to="/login" className="block text-gray-600 hover:text-gray-900">
-//                 Login
-//               </Link>
-//               <Link
-//                 to="/signup"
-//                 className="w-full block text-center bg-gray-900 text-white px-6 py-2 rounded-full font-medium hover:bg-gray-800"
-//               >
-//                 Get Started
-//               </Link>
-//             </>
-//           )}
-//         </div>
-//       )}
-//     </>
-//   );
-// };
-
-// export default Header;
-
-
-
-
-
-
-// {ORIGINAL }
-// import React, { useState, useRef, useEffect } from "react";
-// import { Link } from "react-router-dom"; // 👈 import Link
-
-// const Header = () => {
-//   const [isMuted, setIsMuted] = useState(false);
-//   const [isSearchVisible, setIsSearchVisible] = useState(false);
-//   const [isScrolled, setIsScrolled] = useState(false);
-//   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-//   const headerRef = useRef(null);
-//   const searchInputRef = useRef(null);
-
-//   // Click outside to close search and mobile menu
-//   useEffect(() => {
-//     const handleClickOutside = (event) => {
-//       if (headerRef.current && !headerRef.current.contains(event.target)) {
-//         setIsSearchVisible(false);
-//         setIsMobileMenuOpen(false);
-//       }
-//     };
-//     document.addEventListener("mousedown", handleClickOutside);
-//     return () => document.removeEventListener("mousedown", handleClickOutside);
-//   }, []);
-
-//   // Auto-focus search input
-//   useEffect(() => {
-//     if (isSearchVisible && searchInputRef.current) {
-//       searchInputRef.current.focus();
-//     }
-//   }, [isSearchVisible]);
-
-//   // Detect scroll
-//   useEffect(() => {
-//     const handleScroll = () => setIsScrolled(window.scrollY > 10);
-//     window.addEventListener("scroll", handleScroll);
-//     return () => window.removeEventListener("scroll", handleScroll);
-//   }, []);
-
-//   // Handlers
-//   const handleSearchClick = (e) => {
-//     e.preventDefault();
-//     setIsSearchVisible(true);
-//   };
-//   const handleMuteClick = () => setIsMuted(!isMuted);
-//   const handleNotificationsClick = () => console.log("Notifications clicked!");
-
-//   return (
-//     <>
-//       <header
-//         ref={headerRef}
-//         className={`flex justify-center transition-all duration-300 z-50 ${
-//           isScrolled ? "fixed top-0 left-0 w-full" : "sticky top-4"
-//         }`}
-//       >
-//         <div
-//           className={`${
-//             isScrolled
-//               ? "w-full rounded-none px-6 md:px-20"
-//               : "w-[90%] md:w-[75%] lg:w-[85%] xl:w-[60%] rounded-full"
-//           } bg-white bg-opacity-90 backdrop-blur-lg border border-gray-200 shadow-md px-6 h-16 flex justify-between items-center transition-all duration-300`}
-//         >
-//           {/* Logo */}
-//           <div className="flex flex-row items-center gap-3">
-//             <img className="h-12 rounded-lg" src="logo final-Photoroom.png" alt="LOGO" />
-//             <h1 className="font-bold text-2xl">Prepvio</h1>
-//           </div>
-
-//           {/* Desktop Navigation */}
-//           <nav className="hidden md:flex items-center space-x-6">
-//             <div className="relative">
-//               {!isSearchVisible ? (
-//                 <a
-//                   href="#"
-//                   className="text-gray-600 hover:text-gray-900"
-//                   onClick={handleSearchClick}
-//                 >
-//                   Search
-//                 </a>
-//               ) : (
-//                 <input
-//                   ref={searchInputRef}
-//                   type="text"
-//                   placeholder="Search..."
-//                   className={`px-4 py-2 rounded-lg  focus:outline-none 
-//                     focus:ring-1 focus:ring-ring-100 transition-all duration-300 ease-in-out ${
-//                       isScrolled ? "w-72" : "w-48"
-//                     }`}
-//                 />
-//               )}
-//             </div>
-
-//             <a href="#" className="text-gray-600 hover:text-gray-900">
-//               About
-//             </a>
-//             <a href="#" className="text-gray-600 hover:text-gray-900">
-//               Explore
-//             </a>
-
-//             <button onClick={handleMuteClick} className="text-gray-600 hover:text-gray-900">
-//               {isMuted ? "Unmute" : "Mute"}
-//             </button>
-
-//             <button
-//               onClick={handleNotificationsClick}
-//               className="flex items-center text-gray-600 hover:text-gray-900"
-//             >
-//               <svg
-//                 xmlns="http://www.w3.org/2000/svg"
-//                 className="h-5 w-5"
-//                 fill="none"
-//                 viewBox="0 0 24 24"
-//                 stroke="currentColor"
-//               >
-//                 <path
-//                   strokeLinecap="round"
-//                   strokeLinejoin="round"
-//                   strokeWidth={2}
-//                   d="M15 17h5l-1.405-1.405C17.653 14.894 17 
-//                   13.985 17 12V9c0-3.313-2.687-6-6-6S5 
-//                   5.687 5 9v3c0 1.985-.653 2.894-1.595 
-//                   3.595L2 17h5m5 0v3a2 2 0 01-2 
-//                   2H9a2 2 0 01-2-2v-3"
-//                 />
-//               </svg>
-//             </button>
-
-//             {/* 👇 Use Link instead of a button for navigation */}
-//             <Link to="/login" className="text-gray-600 hover:text-gray-900">
-//               Login
-//             </Link>
-
-//             <Link
-//               to="/signup"
-//               className="bg-gray-900 text-white px-6 py-2 rounded-full font-medium hover:bg-gray-800"
-//             >
-//               Get Started
-//             </Link>
-//           </nav>
-
-//           {/* Mobile Hamburger */}
-//           <button
-//             className="md:hidden flex items-center justify-center text-gray-700"
-//             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-//           >
-//             {isMobileMenuOpen ? (
-//               <svg
-//                 className="w-6 h-6"
-//                 fill="none"
-//                 stroke="currentColor"
-//                 viewBox="0 0 24 24"
-//               >
-//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-//               </svg>
-//             ) : (
-//               <svg
-//                 className="w-6 h-6"
-//                 fill="none"
-//                 stroke="currentColor"
-//                 viewBox="0 0 24 24"
-//               >
-//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-//               </svg>
-//             )}
-//           </button>
-//         </div>
-//       </header>
-
-//       {/* Mobile Menu Dropdown */}
-//       {isMobileMenuOpen && (
-//         <div className="md:hidden bg-white border-t border-gray-200 shadow-md px-6 py-4 space-y-4">
-//           <a href="#" className="block text-gray-600 hover:text-gray-900">
-//             About
-//           </a>
-//           <a href="#" className="block text-gray-600 hover:text-gray-900">
-//             Explore
-//           </a>
-//           <button onClick={handleMuteClick} className="block text-gray-600 hover:text-gray-900">
-//             {isMuted ? "Unmute" : "Mute"}
-//           </button>
-//           <button
-//             onClick={handleNotificationsClick}
-//             className="block text-gray-600 hover:text-gray-900"
-//           >
-//             Notifications
-//           </button>
-
-//           {/* 👇 Mobile menu links */}
-//           <Link to="/login" className="block text-gray-600 hover:text-gray-900">
-//             Login
-//           </Link>
-
-//           <Link
-//             to="/signup"
-//             className="w-full block text-center bg-gray-900 text-white px-6 py-2 rounded-full font-medium hover:bg-gray-800"
-//           >
-//             Get Started
-//           </Link>
-//         </div>
-//       )}
-//     </>
-//   );
-// };
-
-// export default Header;

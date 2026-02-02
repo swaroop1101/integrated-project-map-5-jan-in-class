@@ -84,13 +84,13 @@ const Rounds = ({ companyType, role }) => {
       
       if (data.requiresPayment) {
         alert("⚠️ No active subscription. Please subscribe to continue.");
-        navigate("/dashboard/payroll");
+        navigate("/dashboard/pricing");
       } else if (data.needsUpgrade) {
         alert("⚠️ No interview credits remaining. Please upgrade your plan.");
-        navigate("/dashboard/payroll");
+        navigate("/dashboard/pricing");
       } else {
         alert(`⚠️ ${data.message || 'Access denied'}`);
-        navigate("/dashboard/payroll");
+        navigate("/dashboard/pricing");
       }
     } else if (error.response) {
       console.error("Server error:", error.response.data);

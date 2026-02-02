@@ -8,7 +8,7 @@
 //    PROFILE
 // ========================================================= */
 // router.get("/me", verifyToken, async (req, res) => {
-//   const user = await User.findById(req.user.id).select("-password");
+//   const user = await User.findById(req.userId).select("-password");
 //   if (!user) return res.status(404).json({ message: "User not found" });
 //   res.json({ success: true, user });
 // });
@@ -32,7 +32,7 @@
 //     return res.status(400).json({ message: "Missing data" });
 //   }
 
-//   const user = await User.findById(req.user.id);
+//   const user = await User.findById(req.userId);
 //   if (!user) {
 //     return res.status(401).json({ message: "User not found" });
 //   }
@@ -85,7 +85,7 @@
 //     return res.status(400).json({ message: "Invalid data" });
 //   }
 
-//   const user = await User.findById(req.user.id);
+//   const user = await User.findById(req.userId);
 //   if (!user) return res.status(404).json({ message: "User not found" });
 
 //   // ✅ GUARD
@@ -150,7 +150,7 @@
 //   async (req, res) => {
 //     const { courseId, channelId } = req.params;
 
-//     const user = await User.findById(req.user.id).lean();
+//     const user = await User.findById(req.userId).lean();
 //     if (!user) return res.status(404).json({ message: "User not found" });
 
 //     const courses = user.courseProgress || [];
@@ -170,7 +170,7 @@
 //    MY LEARNING
 // ========================================================= */
 // router.get("/my-learning", verifyToken, async (req, res) => {
-//   const user = await User.findById(req.user.id).lean();
+//   const user = await User.findById(req.userId).lean();
 //   if (!user) return res.status(404).json({ message: "User not found" });
 
 //   const courses = user.courseProgress || [];
@@ -220,7 +220,7 @@
 //   async (req, res) => {
 //     const { courseId, channelId } = req.params;
 
-//     const user = await User.findById(req.user.id);
+//     const user = await User.findById(req.userId);
 //     if (!user) return res.status(404).json({ message: "User not found" });
 
 //     user.courseProgress = (user.courseProgress || []).filter(
@@ -243,7 +243,7 @@
 //     return res.status(400).json({ message: "Video ID required" });
 //   }
 
-//   const user = await User.findById(req.user.id);
+//   const user = await User.findById(req.userId);
 //   if (!user) return res.status(404).json({ message: "User not found" });
 
 //   const exists = user.savedVideos.find((v) => v.videoId === videoId);
@@ -265,7 +265,7 @@
 // });
 
 // router.get("/watch-later", verifyToken, async (req, res) => {
-//   const user = await User.findById(req.user.id).lean();
+//   const user = await User.findById(req.userId).lean();
 //   if (!user) return res.status(404).json({ message: "User not found" });
 
 //   res.json({ success: true, data: user.savedVideos || [] });
@@ -281,7 +281,7 @@
 //     return res.status(400).json({ message: "Invalid data" });
 //   }
 
-//   const user = await User.findById(req.user.id);
+//   const user = await User.findById(req.userId);
 //   if (!user) return res.status(404).json({ message: "User not found" });
 
 //   if (!user.courseProgress) {
@@ -307,7 +307,7 @@
 // ========================================================= */
 // router.get("/dashboard", verifyToken, async (req, res) => {
 //   try {
-//     const user = await User.findById(req.user.id).lean();
+//     const user = await User.findById(req.userId).lean();
 //     if (!user) {
 //       return res.status(404).json({ message: "User not found" });
 //     }
@@ -493,13 +493,13 @@
 //       return res.status(400).json({ message: "Missing feedback data" });
 //     }
 
-//     const user = await User.findById(req.user.id);
+//     const user = await User.findById(req.userId);
 //     if (!user) return res.status(404).json({ message: "User not found" });
 
 //     const isCourseFeedback = Boolean(courseId && channelId);
 
 //     user.feedbacks.push({
-//       userId: req.user.id,
+//       userId: req.userId,
 //       courseId: isCourseFeedback ? courseId : null,
 //       channelId: isCourseFeedback ? channelId : null,
 //       type: isCourseFeedback ? "course" : "general",
@@ -539,7 +539,7 @@
 //     return res.status(400).json({ message: "Invalid aptitude data" });
 //   }
 
-//   const user = await User.findById(req.user.id);
+//   const user = await User.findById(req.userId);
 //   if (!user) {
 //     return res.status(401).json({ message: "User not found" });
 //   }
@@ -587,7 +587,7 @@
 // ========================================================= */
 // router.get("/aptitude/attempts", verifyToken, async (req, res) => {
 //   try {
-//     const user = await User.findById(req.user.id)
+//     const user = await User.findById(req.userId)
 //       .select("aptitudeAttempts")
 //       .lean();
 
@@ -610,7 +610,7 @@
 // ========================================================= */
 // router.get("/aptitude/latest", verifyToken, async (req, res) => {
 //   try {
-//     const user = await User.findById(req.user.id)
+//     const user = await User.findById(req.userId)
 //       .select("aptitudeAttempts")
 //       .lean();
 
@@ -655,16 +655,338 @@
 import express from "express";
 import { User } from "../models/User.js";
 import { verifyToken } from "../middleware/verifytoken.js";
+import { sendCourseStartedNotification, sendCourseCompletedNotification } from "../Utils/notificationHelper.js";
 
 const router = express.Router();
 
 /* =========================================================
+   PORTFOLIO & PROJECTS
+========================================================= */
+router.get("/portfolio", verifyToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select("-password").lean();
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const interviews = user.interviewAttempts || [];
+    const aptitude = user.aptitudeAttempts || [];
+    const projects = user.projects || []; // ✅ Now reading from user.projects
+
+    // Calculate Interview Metrics from actual interview data
+    
+    // 1. Logic Accuracy - From CODING rounds in interviews
+    const codingInterviews = interviews.filter(i => 
+      i.role?.toLowerCase().includes('coding') || 
+      i.role?.toLowerCase().includes('programming') ||
+      i.role?.toLowerCase().includes('algorithm') ||
+      i.role?.toLowerCase().includes('dsa') ||
+      i.role?.toLowerCase().includes('technical')
+    );
+    const logicAccuracy = codingInterviews.length > 0
+      ? Math.round(codingInterviews.reduce((sum, i) => sum + (i.score || 0), 0) / codingInterviews.length)
+      : 0;
+
+    // 2. Communication Skills - Based on feedback quality and soft skills assessment
+    const communicationInterviews = interviews.filter(i => 
+      i.role?.toLowerCase().includes('hr') ||
+      i.role?.toLowerCase().includes('behavioral') ||
+      i.role?.toLowerCase().includes('communication') ||
+      (i.feedback && i.feedback.length > 20)
+    );
+    const commSkills = communicationInterviews.length > 0
+      ? Math.round(communicationInterviews.reduce((sum, i) => sum + (i.score || 0), 0) / communicationInterviews.length)
+      : (interviews.length > 0 ? Math.round(interviews.reduce((sum, i) => sum + (i.score || 0), 0) / interviews.length) : 0);
+
+    // 3. System Design - ALL technical interviews
+    const systemDesignInterviews = interviews.filter(i => 
+      !i.role?.toLowerCase().includes('hr') &&
+      !i.role?.toLowerCase().includes('behavioral')
+    );
+    const systemDesign = systemDesignInterviews.length > 0
+      ? Math.round(systemDesignInterviews.reduce((sum, i) => sum + (i.score || 0), 0) / systemDesignInterviews.length)
+      : 0;
+
+    // 4. Culture Fit - Based on HR rounds + positive feedback
+    const cultureFitInterviews = interviews.filter(i => 
+      i.role?.toLowerCase().includes('hr') ||
+      i.role?.toLowerCase().includes('cultural') ||
+      i.role?.toLowerCase().includes('behavioral') ||
+      (i.feedback && (
+        i.feedback.toLowerCase().includes('good') ||
+        i.feedback.toLowerCase().includes('great') ||
+        i.feedback.toLowerCase().includes('excellent') ||
+        i.feedback.toLowerCase().includes('strong')
+      ))
+    );
+    const cultureFit = cultureFitInterviews.length > 0
+      ? Math.round(cultureFitInterviews.reduce((sum, i) => sum + (i.score || 0), 0) / cultureFitInterviews.length)
+      : (interviews.length > 0 ? Math.round(interviews.reduce((sum, i) => sum + (i.score || 0), 0) / interviews.length) : 0);
+
+    // ✅ Return portfolio data with projects
+    res.status(200).json({
+      success: true,
+      user: {
+        name: user.name || "User",
+        bio: user.bio || "Passionate developer building amazing things.",
+        avatarUrl: user.avatarUrl || "/swaroopProfile.jpg",
+        profilePic: user.profilePic || null,
+        location: user.location || {},
+      },
+      skills: user.courseProgress || [],
+      interviews: interviews,
+      aptitude: aptitude,
+      projects: projects, // ✅ Now returns actual projects
+      metrics: {
+        logicAccuracy,
+        commSkills,
+        systemDesign,
+        cultureFit
+      }
+    });
+  } catch (error) {
+    console.error("Portfolio fetch error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/* =========================================================
+   ✅ PROJECT MANAGEMENT ENDPOINTS
+========================================================= */
+
+// CREATE PROJECT
+router.post("/projects", verifyToken, async (req, res) => {
+  try {
+    const { title, description, tags, imageUrl, liveLink, githubLink, featured } = req.body;
+
+    // Validation
+    if (!title || !description) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Title and description are required" 
+      });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Create new project object
+    const newProject = {
+      title: title.trim(),
+      description: description.trim(),
+      tags: Array.isArray(tags) ? tags.filter(t => t.trim()) : [],
+      imageUrl: imageUrl || "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800",
+      liveLink: liveLink?.trim() || "",
+      githubLink: githubLink?.trim() || "",
+      featured: Boolean(featured),
+    };
+
+    // Add to user's projects array
+    user.projects.push(newProject);
+    await user.save();
+
+    // Get the newly created project (last one in array)
+    const createdProject = user.projects[user.projects.length - 1];
+
+    res.status(201).json({
+      success: true,
+      message: "Project created successfully",
+      project: createdProject,
+    });
+  } catch (error) {
+    console.error("Create project error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET ALL PROJECTS (for current user)
+router.get("/projects", verifyToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select("projects").lean();
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      projects: user.projects || [],
+    });
+  } catch (error) {
+    console.error("Get projects error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET SINGLE PROJECT
+router.get("/projects/:projectId", verifyToken, async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    const user = await User.findById(req.userId).select("projects").lean();
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const project = user.projects.find(p => p._id.toString() === projectId);
+    if (!project) {
+      return res.status(404).json({ success: false, message: "Project not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      project,
+    });
+  } catch (error) {
+    console.error("Get project error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// UPDATE PROJECT
+router.put("/projects/:projectId", verifyToken, async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { title, description, tags, imageUrl, liveLink, githubLink, featured } = req.body;
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Find project
+    const project = user.projects.id(projectId);
+    if (!project) {
+      return res.status(404).json({ success: false, message: "Project not found" });
+    }
+
+    // Update fields
+    if (title !== undefined) project.title = title.trim();
+    if (description !== undefined) project.description = description.trim();
+    if (tags !== undefined) project.tags = Array.isArray(tags) ? tags.filter(t => t.trim()) : [];
+    if (imageUrl !== undefined) project.imageUrl = imageUrl;
+    if (liveLink !== undefined) project.liveLink = liveLink?.trim() || "";
+    if (githubLink !== undefined) project.githubLink = githubLink?.trim() || "";
+    if (featured !== undefined) project.featured = Boolean(featured);
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Project updated successfully",
+      project,
+    });
+  } catch (error) {
+    console.error("Update project error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// DELETE PROJECT
+router.delete("/projects/:projectId", verifyToken, async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Find and remove project
+    const projectIndex = user.projects.findIndex(p => p._id.toString() === projectId);
+    if (projectIndex === -1) {
+      return res.status(404).json({ success: false, message: "Project not found" });
+    }
+
+    user.projects.splice(projectIndex, 1);
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Project deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete project error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/* =========================================================
    PROFILE
 ========================================================= */
+
+// FETCH PROFILE
 router.get("/me", verifyToken, async (req, res) => {
-  const user = await User.findById(req.user.id).select("-password");
-  if (!user) return res.status(404).json({ message: "User not found" });
-  res.json({ success: true, user });
+  try {
+    const user = await User.findById(req.userId).select("-password").lean();
+    if (!user) return res.status(404).json({ message: "User not found" });
+    
+    res.json({ 
+      success: true, 
+      user
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// UPDATE PROFILE
+router.put("/me", verifyToken, async (req, res) => {
+  try {
+    const { firstName, lastName, phone, bio, location } = req.body;
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Update fields directly (pre-save hook will sync name automatically)
+    if (firstName !== undefined) user.firstName = firstName;
+    if (lastName !== undefined) user.lastName = lastName;
+    if (phone) user.phone = phone;
+    if (bio) user.bio = bio;
+    if (location) user.location = location;
+
+    await user.save();
+    
+    res.json({ 
+      success: true, 
+      message: "Profile updated successfully", 
+      user: {
+        ...user.toObject(),
+        password: undefined
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/* =========================================================
+   UPLOAD PROFILE PICTURE
+========================================================= */
+router.post("/upload-profile-pic", verifyToken, async (req, res) => {
+  try {
+    const { profilePic } = req.body;
+
+    if (!profilePic) {
+      return res.status(400).json({ success: false, message: "No image provided" });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    // ✅ Store base64 image string directly
+    user.profilePic = profilePic;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Profile picture updated successfully",
+      profilePic: user.profilePic
+    });
+  } catch (err) {
+    console.error("Profile pic upload error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 /* =========================================================
@@ -679,12 +1001,11 @@ router.post("/start-learning", verifyToken, async (req, res) => {
     channelThumbnail,
   } = req.body;
 
-  // ✅ Validate
   if (!courseId || !courseTitle || !channelId || !channelName) {
     return res.status(400).json({ message: "Missing data" });
   }
 
-  const user = await User.findById(req.user.id);
+  const user = await User.findById(req.userId);
   if (!user) {
     return res.status(401).json({ message: "User not found" });
   }
@@ -693,12 +1014,30 @@ router.post("/start-learning", verifyToken, async (req, res) => {
     user.courseProgress = [];
   }
 
-  const exists = user.courseProgress.find(
-    (c) => c.courseId === courseId && c.channelId === channelId
+  // ✅ REMOVE ANY DUPLICATES WITH 0 PROGRESS (KEEP THE ONE WITH PROGRESS)
+  const courseIdStr = String(courseId);
+  const channelIdStr = String(channelId);
+  
+  const existingEntries = user.courseProgress.filter(
+    (c) => String(c.courseId) === courseIdStr && String(c.channelId) === channelIdStr
   );
 
-  // ✅ ONLY COURSE LOGIC HERE
-  if (!exists) {
+  if (existingEntries.length > 0) {
+    // Multiple entries exist - keep the one with most progress
+    const entryWithMostProgress = existingEntries.reduce((max, current) =>
+      (current.watchedSeconds || 0) > (max.watchedSeconds || 0) ? current : max
+    );
+
+    // Remove all duplicates
+    user.courseProgress = user.courseProgress.filter(
+      (c) => !(String(c.courseId) === courseIdStr && String(c.channelId) === channelIdStr)
+    );
+
+    // Add back only the one with most progress
+    user.courseProgress.push(entryWithMostProgress);
+    await user.save();
+  } else {
+    // No existing entry, add new one
     user.courseProgress.push({
       courseId,
       courseTitle,
@@ -713,6 +1052,8 @@ router.post("/start-learning", verifyToken, async (req, res) => {
     });
 
     await user.save();
+    // ✅ SEND COURSE STARTED NOTIFICATION (ONLY for new courses)
+    await sendCourseStartedNotification(req.userId, courseTitle, channelName);
   }
 
   return res.json({ success: true });
@@ -735,10 +1076,9 @@ router.post("/video-progress", verifyToken, async (req, res) => {
     return res.status(400).json({ message: "Invalid data" });
   }
 
-  const user = await User.findById(req.user.id);
+  const user = await User.findById(req.userId);
   if (!user) return res.status(404).json({ message: "User not found" });
 
-  // ✅ GUARD
   if (!user.courseProgress) {
     user.courseProgress = [];
   }
@@ -754,9 +1094,9 @@ router.post("/video-progress", verifyToken, async (req, res) => {
   let video = course.videos.find((v) => v.videoId === videoId);
 
   const safeWatched =
-  durationSeconds > 0
-    ? Math.min(Math.max(watchedSeconds, 0), durationSeconds)
-    : Math.max(watchedSeconds, 0);
+    durationSeconds > 0
+      ? Math.min(Math.max(watchedSeconds, 0), durationSeconds)
+      : Math.max(watchedSeconds, 0);
 
   if (!video) {
     course.videos.push({
@@ -769,8 +1109,7 @@ router.post("/video-progress", verifyToken, async (req, res) => {
   } else {
     video.watchedSeconds = Math.max(video.watchedSeconds, safeWatched);
     video.durationSeconds = durationSeconds;
-    video.completed =
-      video.watchedSeconds >= video.durationSeconds * 0.9;
+    video.completed = video.watchedSeconds >= video.durationSeconds * 0.9;
     video.updatedAt = new Date();
   }
 
@@ -783,9 +1122,22 @@ router.post("/video-progress", verifyToken, async (req, res) => {
     0
   );
 
+  // ✅ CHECK IF COURSE IS COMPLETED (90% of all videos watched)
+  const isCourseCompleted = course.totalSeconds > 0 && 
+    course.watchedSeconds >= course.totalSeconds * 0.9;
+  
+  const wasCourseAlreadyCompleted = course.completed;
+  course.completed = isCourseCompleted;
+
   course.lastAccessed = new Date();
 
   await user.save();
+  
+  // ✅ SEND COURSE COMPLETION NOTIFICATION (ONLY ONCE)
+  if (isCourseCompleted && !wasCourseAlreadyCompleted) {
+    await sendCourseCompletedNotification(req.userId, course.courseTitle, course.channelName);
+  }
+
   res.json({ success: true });
 });
 
@@ -798,7 +1150,7 @@ router.get(
   async (req, res) => {
     const { courseId, channelId } = req.params;
 
-    const user = await User.findById(req.user.id).lean();
+    const user = await User.findById(req.userId).lean();
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const courses = user.courseProgress || [];
@@ -818,11 +1170,25 @@ router.get(
    MY LEARNING
 ========================================================= */
 router.get("/my-learning", verifyToken, async (req, res) => {
-  const user = await User.findById(req.user.id).lean();
+  const user = await User.findById(req.userId).lean();
   if (!user) return res.status(404).json({ message: "User not found" });
 
-  const courses = user.courseProgress || [];
+  let courses = user.courseProgress || [];
   const feedbacks = user.feedbacks || [];
+
+  // ✅ DEDUPLICATE: Keep entry with most progress, remove zero-progress duplicates
+  const courseMap = new Map();
+  
+  courses.forEach((course) => {
+    const key = `${course.courseId}-${course.channelId}`;
+    const existing = courseMap.get(key);
+    
+    if (!existing || (course.watchedSeconds || 0) > (existing.watchedSeconds || 0)) {
+      courseMap.set(key, course);
+    }
+  });
+
+  courses = Array.from(courseMap.values());
 
   const data = courses.map((course) => {
     let lastVideoId = null;
@@ -834,7 +1200,6 @@ router.get("/my-learning", verifyToken, async (req, res) => {
       lastVideoId = lastVideo.videoId;
     }
 
-    // 🔑 CHECK IF FEEDBACK EXISTS FOR THIS COURSE
     const hasFeedback = feedbacks.some(
       (fb) =>
         fb.courseId === course.courseId &&
@@ -867,7 +1232,7 @@ router.delete(
   async (req, res) => {
     const { courseId, channelId } = req.params;
 
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
     user.courseProgress = (user.courseProgress || []).filter(
@@ -890,7 +1255,7 @@ router.post("/watch-later", verifyToken, async (req, res) => {
     return res.status(400).json({ message: "Video ID required" });
   }
 
-  const user = await User.findById(req.user.id);
+  const user = await User.findById(req.userId);
   if (!user) return res.status(404).json({ message: "User not found" });
 
   const exists = user.savedVideos.find((v) => v.videoId === videoId);
@@ -912,7 +1277,7 @@ router.post("/watch-later", verifyToken, async (req, res) => {
 });
 
 router.get("/watch-later", verifyToken, async (req, res) => {
-  const user = await User.findById(req.user.id).lean();
+  const user = await User.findById(req.userId).lean();
   if (!user) return res.status(404).json({ message: "User not found" });
 
   res.json({ success: true, data: user.savedVideos || [] });
@@ -928,7 +1293,7 @@ router.post("/update-course-total", verifyToken, async (req, res) => {
     return res.status(400).json({ message: "Invalid data" });
   }
 
-  const user = await User.findById(req.user.id);
+  const user = await User.findById(req.userId);
   if (!user) return res.status(404).json({ message: "User not found" });
 
   if (!user.courseProgress) {
@@ -954,14 +1319,11 @@ router.post("/update-course-total", verifyToken, async (req, res) => {
 ========================================================= */
 router.get("/dashboard", verifyToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).lean();
+    const user = await User.findById(req.userId).lean();
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    /* ======================================================
-       COURSES + COMPLETION
-    ====================================================== */
     const courses = (user.courseProgress || []).map((c) => {
       const completed =
         c.totalSeconds > 0 && c.watchedSeconds >= c.totalSeconds * 0.9;
@@ -988,16 +1350,9 @@ router.get("/dashboard", verifyToken, async (req, res) => {
       0
     );
 
-    /* ======================================================
-       RESUME COURSE
-    ====================================================== */
     const resumeCourse = courses
       .filter(c => !c.completed && c.watchedSeconds > 0)
       .sort((a, b) => new Date(b.lastAccessed) - new Date(a.lastAccessed))[0];
-
-    /* ======================================================
-       WEEKLY LEARNING ACTIVITY (ROLLING 4 WEEKS)
-    ====================================================== */
 
     const getWeekBucket = (date) => {
       const now = new Date();
@@ -1025,15 +1380,11 @@ router.get("/dashboard", verifyToken, async (req, res) => {
       }
     });
 
-    // convert seconds → hours (1 decimal)
     Object.keys(weeklyActivity).forEach(key => {
       weeklyActivity[key] =
         Math.round((weeklyActivity[key] / 3600) * 10) / 10;
     });
 
-    /* ======================================================
-       RESPONSE
-    ====================================================== */
     res.json({
       stats: {
         totalCourses,
@@ -1063,13 +1414,13 @@ router.get("/dashboard", verifyToken, async (req, res) => {
 router.get("/admin/all-users", async (req, res) => {
   try {
     const users = await User.find({})
-      .select("firstName lastName email isVerified createdAt");
+      .select("firstName lastName name email isVerified createdAt");
 
     res.json({
       success: true,
       data: users.map(u => ({
         id: u._id,
-        name: `${u.firstName} ${u.lastName}`,
+        name: u.name || `${u.firstName || ""} ${u.lastName || ""}`.trim() || "No Name",
         email: u.email,
         featureAccess: "All Features",
         status: u.isVerified ? "Active" : "Suspended"
@@ -1112,7 +1463,7 @@ router.get("/admin/user/:userId", async (req, res) => {
       success: true,
       user: {
         id: user._id,
-        name: `${user.firstName} ${user.lastName}`,
+        name: user.name || `${user.firstName || ""} ${user.lastName || ""}`.trim() || "No Name",
         email: user.email,
       },
       courses,
@@ -1135,13 +1486,13 @@ router.post("/feedback", verifyToken, async (req, res) => {
       return res.status(400).json({ message: "Missing feedback data" });
     }
 
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const isCourseFeedback = Boolean(courseId && channelId);
 
     user.feedbacks.push({
-      userId: req.user.id,
+      userId: req.userId,
       courseId: isCourseFeedback ? courseId : null,
       channelId: isCourseFeedback ? channelId : null,
       type: isCourseFeedback ? "course" : "general",
@@ -1181,7 +1532,7 @@ router.post("/aptitude/submit", verifyToken, async (req, res) => {
     return res.status(400).json({ message: "Invalid aptitude data" });
   }
 
-  const user = await User.findById(req.user.id);
+  const user = await User.findById(req.userId);
   if (!user) {
     return res.status(401).json({ message: "User not found" });
   }
@@ -1223,7 +1574,7 @@ router.post("/aptitude/submit", verifyToken, async (req, res) => {
 ========================================================= */
 router.get("/aptitude/attempts", verifyToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id)
+    const user = await User.findById(req.userId)
       .select("aptitudeAttempts")
       .lean();
 
@@ -1246,7 +1597,7 @@ router.get("/aptitude/attempts", verifyToken, async (req, res) => {
 ========================================================= */
 router.get("/aptitude/latest", verifyToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id)
+    const user = await User.findById(req.userId)
       .select("aptitudeAttempts")
       .lean();
 

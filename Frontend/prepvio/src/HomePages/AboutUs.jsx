@@ -191,7 +191,7 @@ const AboutUs = () => {
                 </button>
 
                 <button
-                  onClick={() => navigate("/dashboard/payroll")}
+                  onClick={() => navigate("/dashboard/pricing")}
                   className="px-8 py-3 rounded-full border-2 border-white/20 text-white font-bold hover:bg-white/10 transition-colors"
                 >
                   Get More Credits
@@ -225,7 +225,7 @@ const AboutUs = () => {
               </p>
 
               <button
-                onClick={() => navigate("/dashboard/payroll")}
+                onClick={() => navigate("/dashboard/pricing")}
                 className="bg-[#D4F478] text-black px-10 py-4 rounded-full font-black hover:scale-[1.02] transition-transform shadow-lg shadow-[#D4F478]/20"
               >
                 Upgrade & Get Credits

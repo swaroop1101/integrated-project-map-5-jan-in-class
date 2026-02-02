@@ -11,7 +11,7 @@ const roleSchema = new mongoose.Schema({
 });
 
 const companySchema = new mongoose.Schema({
-  name: { type: String, required: true },
+  name: { type: String }, // ✅ Optional - only company type and roles required
   roles: [roleSchema],
 });
 

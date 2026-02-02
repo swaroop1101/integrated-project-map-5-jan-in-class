@@ -80,7 +80,7 @@ const FAQSection = () => {
                     <HelpCircle className="w-5 h-5 text-purple-600" />
                   </div>
                   <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest border border-gray-100 px-2 py-1 rounded-full">
-                    ID-{item.id}
+                    FAQ - {item.id}
                   </span>
                 </div>
 
