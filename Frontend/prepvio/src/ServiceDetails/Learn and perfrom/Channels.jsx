@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { useParams, useNavigate } from "react-router-dom";
-import { Columns, List, ExternalLink, PlayCircle, ArrowLeft, Sparkles, Youtube, Award, Zap } from "lucide-react";
+import { Columns, List, ExternalLink, PlayCircle, ArrowLeft, Sparkles, Youtube, Award, Zap, LayoutDashboard, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import UserAvatar from "../../components/UserAvatar.jsx";
+import { useAuthStore } from "../../store/authstore.js";
 
 // --- ANIMATION VARIANTS ---
 const floatVariants = {
@@ -29,6 +31,36 @@ function Channels() {
     const [isLandscapeMode, setIsLandscapeMode] = useState(false);
     const { courseId } = useParams();
     const navigate = useNavigate();
+    const { user, logout, isAuthenticated } = useAuthStore();
+    const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+    const profileDropdownRef = useRef(null);
+
+    const handleLogout = async () => {
+        await logout();
+        navigate("/login");
+    };
+
+    const handleDashboardClick = () => {
+        navigate("/dashboard");
+        setIsProfileDropdownOpen(false);
+    };
+
+    const handleProfileClick = () => {
+        setIsProfileDropdownOpen(!isProfileDropdownOpen);
+    };
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
+                setIsProfileDropdownOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, []);
 
     // ✅ Color Theme Configuration
     const colorMap = [
@@ -94,15 +126,52 @@ function Channels() {
             <div className="max-w-[1600px] mx-auto px-4 md:px-6 py-6 md:py-8 pb-20">
 
                 {/* BACK BUTTON */}
-                <button
-                    onClick={() => navigate(-1)}
-                    className="flex items-center gap-2 text-gray-500 hover:text-black font-bold transition-colors mb-6 group ml-1"
-                >
-                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-gray-100 shadow-sm group-hover:shadow-md transition-all">
-                        <ArrowLeft className="w-5 h-5" />
-                    </div>
-                    <span>Back to Courses</span>
-                </button>
+                {/* COMBINED NAVIGATION BAR - Back Button + User Avatar */}
+                <div className="flex items-center justify-between mb-6 relative z-50">
+                    {/* Back to Courses Button */}
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="flex items-center gap-2 text-gray-500 hover:text-black font-bold transition-colors group"
+                    >
+                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-gray-100 shadow-sm group-hover:shadow-md transition-all">
+                            <ArrowLeft className="w-5 h-5" />
+                        </div>
+                        <span className="hidden sm:inline">Back to Courses</span>
+                    </button>
+
+                    {/* User Avatar / Sign In Button */}
+                    {isAuthenticated && user ? (
+                        <div className="relative" ref={profileDropdownRef}>
+                            <UserAvatar
+                                image={user.profilePic || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}`}
+                                name={user.name}
+                                onClick={handleProfileClick}
+                            />
+                            <AnimatePresence>
+                                {isProfileDropdownOpen && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: 15, scale: 0.95 }}
+                                        className="absolute right-0 mt-3 w-56 bg-white/90 backdrop-blur-2xl border border-white rounded-[1.5rem] shadow-2xl overflow-hidden z-50 p-2"
+                                    >
+                                        <button onClick={handleDashboardClick} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer">
+                                            <LayoutDashboard className="w-4 h-4 text-gray-400" /> Dashboard
+                                        </button>
+                                        <div className="h-px bg-gray-100 my-1 mx-2"></div>
+                                        <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50 rounded-xl transition-colors cursor-pointer">
+                                            <LogOut className="w-4 h-4" /> Logout
+                                        </button>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    ) : (
+                        <button onClick={() => navigate('/login')} className="px-6 py-2 bg-black text-white rounded-full font-bold text-sm hover:bg-gray-800 transition-colors">
+                            Sign In
+                        </button>
+                    )}
+                </div>
 
                 {/* ✅ HERO SECTION */}
                 <div className="max-w-5xl mx-auto relative mb-12">
@@ -163,8 +232,8 @@ function Channels() {
                                     <button
                                         onClick={() => setIsLandscapeMode(false)}
                                         className={`p-3 rounded-full transition-all duration-300 ${!isLandscapeMode
-                                                ? "bg-white text-black shadow-lg scale-105"
-                                                : "text-gray-400 hover:text-white hover:bg-white/10"
+                                            ? "bg-white text-black shadow-lg scale-105"
+                                            : "text-gray-400 hover:text-white hover:bg-white/10"
                                             }`}
                                     >
                                         <Columns className="w-5 h-5" />
@@ -172,8 +241,8 @@ function Channels() {
                                     <button
                                         onClick={() => setIsLandscapeMode(true)}
                                         className={`p-3 rounded-full transition-all duration-300 ${isLandscapeMode
-                                                ? "bg-white text-black shadow-lg scale-105"
-                                                : "text-gray-400 hover:text-white hover:bg-white/10"
+                                            ? "bg-white text-black shadow-lg scale-105"
+                                            : "text-gray-400 hover:text-white hover:bg-white/10"
                                             }`}
                                     >
                                         <List className="w-5 h-5" />

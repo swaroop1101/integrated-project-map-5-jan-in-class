@@ -13,7 +13,9 @@ export const useNotificationStore = create((set) => ({
       });
       if (!response.ok) throw new Error('Failed to fetch recent notifications');
       const data = await response.json();
-      set({ recentNotifications: data });
+      // Deduplicate fetched data
+      const uniqueData = data.filter((n, i, arr) => arr.findIndex(x => x._id === n._id) === i);
+      set({ recentNotifications: uniqueData });
     } catch (error) {
       console.error('Error fetching recent notifications:', error);
     }
@@ -27,7 +29,9 @@ export const useNotificationStore = create((set) => ({
       });
       if (!response.ok) throw new Error('Failed to fetch notifications');
       const data = await response.json();
-      set({ notifications: data });
+      // Deduplicate fetched data
+      const uniqueData = data.filter((n, i, arr) => arr.findIndex(x => x._id === n._id) === i);
+      set({ notifications: uniqueData });
     } catch (error) {
       console.error('Error fetching notifications:', error);
     }

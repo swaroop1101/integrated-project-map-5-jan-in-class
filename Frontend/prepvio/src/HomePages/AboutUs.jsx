@@ -2,12 +2,12 @@ import React from "react";
 import { useAuthStore } from "../store/authstore.js";
 
 import { motion } from "framer-motion";
-import { 
-  Bot, 
-  BarChart3, 
-  FileText, 
-  Target, 
-  Zap, 
+import {
+  Bot,
+  BarChart3,
+  FileText,
+  Target,
+  Zap,
   ShieldCheck,
   Gift,
   Sparkles,
@@ -42,7 +42,7 @@ const features = [
 ];
 
 const FeatureCard = ({ icon, title, description, color }) => (
-  <motion.div 
+  <motion.div
     whileHover={{ y: -8, scale: 1.02 }}
     className="bg-white/60 backdrop-blur-md p-8 rounded-[2.5rem] border border-white shadow-xl shadow-gray-100 flex flex-col items-start text-left gap-4 hover:bg-white transition-all group"
   >
@@ -66,7 +66,7 @@ const AboutUs = () => {
       {/* ✅ Dominate Your Interview Section */}
       <section id="features" className="container mx-auto px-6">
         <div className="text-center max-w-3xl mx-auto mb-16">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             whileInView={{ opacity: 1, y: 0 }}
             className="inline-flex items-center gap-2 bg-white border border-gray-100 px-4 py-2 rounded-full shadow-sm mb-6"
@@ -74,13 +74,13 @@ const AboutUs = () => {
             <Zap className="w-4 h-4 text-[#D4F478] fill-[#D4F478]" />
             <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Next-Gen Preparation</span>
           </motion.div>
-          
+
           <h2 className="text-4xl md:text-6xl font-black text-gray-900 mb-6 tracking-tighter">
             Dominate Your <br />
             <span className="text-gray-400">Interview Process</span>
           </h2>
           <p className="text-lg text-gray-500 font-medium leading-relaxed">
-            Master every interview with AI that adapts to your role and company. <br/> We don't just help you practice, we help you win.
+            Master every interview with AI that adapts to your role and company. <br /> We don't just help you practice, we help you win.
           </p>
         </div>
 
@@ -100,7 +100,7 @@ const AboutUs = () => {
         {/* ================= INTERVIEW CTA ================= */}
         {!isAuthenticated ? (
           /* ===== NOT LOGGED IN ===== */
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
@@ -150,7 +150,7 @@ const AboutUs = () => {
           </motion.div>
         ) : hasInterviewCredits ? (
           /* ===== HAS CREDITS ===== */
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
@@ -169,7 +169,7 @@ const AboutUs = () => {
 
                 <div>
                   <h4 className="text-3xl font-black text-white mb-2">
-                    You've Got Interview Credits 
+                    You've Got Interview Credits
                   </h4>
                   <p className="text-gray-400 text-lg">
                     You have{" "}
@@ -185,14 +185,14 @@ const AboutUs = () => {
               <div className="flex flex-col gap-3">
                 <button
                   onClick={() => navigate("/services/check-your-ability/interview")}
-                  className="bg-[#D4F478] text-black px-8 py-4 rounded-full font-black hover:scale-[1.02] transition-transform shadow-lg"
+                  className="bg-[#D4F478] text-black px-8 py-4 rounded-full font-black hover:scale-[1.02] transition-transform shadow-lg cursor-pointer"
                 >
                   Start Interview
                 </button>
 
                 <button
                   onClick={() => navigate("/dashboard/pricing")}
-                  className="px-8 py-3 rounded-full border-2 border-white/20 text-white font-bold hover:bg-white/10 transition-colors"
+                  className="px-8 py-3 rounded-full border-2 border-white/20 text-white font-bold hover:bg-white/10 transition-colors cursor-pointer"
                 >
                   Get More Credits
                 </button>

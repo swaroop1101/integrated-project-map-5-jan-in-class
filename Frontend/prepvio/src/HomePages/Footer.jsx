@@ -42,11 +42,11 @@ function Footer() {
         {/* Decorative elements */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#D4F478]/5 rounded-full blur-[120px] pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-blue-50 rounded-full blur-[120px] pointer-events-none" />
-        
+
         <div className="max-w-7xl mx-auto px-6 md:px-12 relative z-10">
           {/* TOP GRID */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-16">
-            
+
             {/* BRANDING SECTION */}
             <div className="md:col-span-5">
               <div className="flex items-center gap-3 mb-6">
@@ -60,16 +60,16 @@ function Footer() {
               <p className="text-gray-600 leading-relaxed mb-8 max-w-sm font-medium">
                 Empowering interview readiness with AI-driven insights and real-world practice. Transform nervous energy into executive presence.
               </p>
-              
+
               {/* SOCIAL LINKS */}
               <div className="flex gap-3">
                 {SOCIAL_LINKS.map(({ name, href, Icon }) => (
-                  <a 
-                    key={name} 
-                    href={href} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    aria-label={name} 
+                  <a
+                    key={name}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={name}
                     className="w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-black hover:text-white transition-all duration-300 hover:scale-110 shadow-sm"
                   >
                     <Icon className="w-5 h-5" />
@@ -83,25 +83,19 @@ function Footer() {
               <h4 className="font-black text-gray-900 mb-6 text-sm uppercase tracking-wider">Quick Links</h4>
               <ul className="space-y-3.5">
                 <li>
-                  <a href="#about" className="text-gray-600 hover:text-black transition-colors font-medium text-sm flex items-center gap-2 group">
-                    <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 -ml-6 group-hover:ml-0 transition-all" />
-                    Our Team
-                  </a>
-                </li>
-                <li>
                   <button
-  onClick={() => navigate("/dashboard/feedback")}
-  className="text-gray-600 hover:text-black transition-colors font-medium text-sm flex items-center gap-2 group"
->
-  <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 -ml-6 group-hover:ml-0 transition-all" />
-  Feedback
-</button>
+                    onClick={() => navigate("/dashboard/feedback")}
+                    className="text-gray-600 hover:text-black transition-colors font-medium text-sm flex items-center gap-2 group cursor-pointer"
+                  >
+                    <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 -ml-6 group-hover:ml-0 transition-all" />
+                    Feedback
+                  </button>
 
                 </li>
                 <li>
-                  <button 
-                    onClick={() => setOpenTerms(true)} 
-                    className="text-gray-600 hover:text-black transition-colors font-medium text-sm flex items-center gap-2 group"
+                  <button
+                    onClick={() => setOpenTerms(true)}
+                    className="text-gray-600 hover:text-black transition-colors font-medium text-sm flex items-center gap-2 group cursor-pointer"
                   >
                     <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 -ml-6 group-hover:ml-0 transition-all" />
                     Terms & Conditions
@@ -116,7 +110,7 @@ function Footer() {
               <ul className="space-y-3.5">
                 <li>
                   <a href="#faqs" className="text-gray-600 hover:text-black transition-colors font-medium text-sm flex items-center gap-2 group">
-                    <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 -ml-6 group-hover:ml-0 transition-all" />
+                    <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 -ml-6 group-hover:ml-0 transition-all cursor-pointer" />
                     FAQs
                   </a>
                 </li>
@@ -127,13 +121,13 @@ function Footer() {
                   </a>
                 </li>
                 <li>
-                  <button 
-                    onClick={() => setOpenTerms(true)} 
+                  {/* <button
+                    onClick={() => setOpenTerms(true)}
                     className="text-gray-600 hover:text-black transition-colors font-medium text-sm flex items-center gap-2 group"
                   >
                     <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 -ml-6 group-hover:ml-0 transition-all" />
                     Privacy Policy
-                  </button>
+                  </button> */}
                 </li>
               </ul>
             </div>
@@ -163,31 +157,12 @@ function Footer() {
           </div>
 
           {/* BOTTOM BAR */}
-          <div className="border-t border-gray-200 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-sm text-gray-500 font-medium">
+          <div className="border-t border-gray-200 pt-8 flex justify-center items-center">
+            <p className="text-sm text-gray-500 font-medium text-center">
               © 2025 PrepVio. All rights reserved.
             </p>
-            <div className="flex flex-wrap gap-6 text-sm">
-              <button 
-                onClick={() => setOpenTerms(true)} 
-                className="text-gray-500 hover:text-black transition-colors font-medium"
-              >
-                Privacy Policy
-              </button>
-              <button 
-                onClick={() => setOpenTerms(true)} 
-                className="text-gray-500 hover:text-black transition-colors font-medium"
-              >
-                Terms of Service
-              </button>
-              <a 
-                href="#" 
-                className="text-gray-500 hover:text-black transition-colors font-medium"
-              >
-                Cookie Policy
-              </a>
-            </div>
           </div>
+
         </div>
 
         {/* Modal */}
@@ -204,7 +179,7 @@ function Footer() {
       <div className="max-w-7xl mx-auto px-6">
         {/* Main Content */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8 mb-8">
-          
+
           {/* BRAND */}
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-4">
@@ -212,10 +187,10 @@ function Footer() {
                 <img src="/newuilogo4.png" alt="PrepVio Icon" className="w-full h-full object-cover" />
               </div>
               <div>
-                <img 
-                  src="/prepvio (1).png" 
-                  alt="PrepVio" 
-                  className="h-7 w-auto object-contain brightness-0 invert" 
+                <img
+                  src="/prepvio (1).png"
+                  alt="PrepVio"
+                  className="h-7 w-auto object-contain brightness-0 invert"
                 />
               </div>
             </div>
@@ -240,8 +215,8 @@ function Footer() {
                   </a>
                 </li>
                 <li>
-                  <button 
-                    onClick={() => setOpenTerms(true)} 
+                  <button
+                    onClick={() => setOpenTerms(true)}
                     className="text-gray-400 hover:text-white transition-colors text-sm font-medium"
                   >
                     Terms
@@ -249,21 +224,21 @@ function Footer() {
                 </li>
               </ul>
             </div>
-            
+
             <div>
               <h5 className="text-white font-bold text-xs uppercase tracking-wider mb-4">Contact</h5>
               <ul className="space-y-2">
                 <li>
-                  <a 
-                    href="mailto:prepvio.ai@gmail.com" 
+                  <a
+                    href="mailto:prepvio.ai@gmail.com"
                     className="text-gray-400 hover:text-white transition-colors text-sm font-medium"
                   >
                     Email Us
                   </a>
                 </li>
                 <li>
-                  <a 
-                    href="tel:+917433877151" 
+                  <a
+                    href="tel:+917433877151"
                     className="text-gray-400 hover:text-white transition-colors text-sm font-medium"
                   >
                     Call Us
@@ -278,12 +253,12 @@ function Footer() {
             <h5 className="text-white font-bold text-xs uppercase tracking-wider mb-4">Follow Us</h5>
             <div className="flex gap-3">
               {SOCIAL_LINKS.map(({ name, href, Icon }) => (
-                <a 
-                  key={name} 
-                  href={href} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  aria-label={name} 
+                <a
+                  key={name}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={name}
                   className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white/60 hover:bg-white hover:text-black transition-all duration-300 hover:scale-110"
                 >
                   <Icon className="w-4 h-4" />
@@ -299,14 +274,14 @@ function Footer() {
             © 2025 PrepVio. All rights reserved.
           </p>
           <div className="flex gap-6 text-xs">
-            <button 
-              onClick={() => setOpenTerms(true)} 
+            <button
+              onClick={() => setOpenTerms(true)}
               className="text-gray-500 hover:text-white transition-colors font-medium"
             >
               Privacy Policy
             </button>
-            <button 
-              onClick={() => setOpenTerms(true)} 
+            <button
+              onClick={() => setOpenTerms(true)}
               className="text-gray-500 hover:text-white transition-colors font-medium"
             >
               Terms of Service

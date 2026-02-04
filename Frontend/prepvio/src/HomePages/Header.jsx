@@ -92,12 +92,13 @@ const Header = () => {
   }, []);
 
   // ✅ FETCH RECENT NOTIFICATIONS AND SETUP SOCKET
+  // ✅ FETCH RECENT NOTIFICATIONS ON MOUNT ONLY
   useEffect(() => {
     if (isAuthenticated) {
       fetchRecentNotifications();
       fetchUnreadCount();
     }
-  }, [isAuthenticated, fetchRecentNotifications, fetchUnreadCount]);
+  }, [isAuthenticated]); // Remove fetchRecentNotifications and fetchUnreadCount from dependencies
 
   // --- EFFECTS ---
   useEffect(() => {
@@ -195,15 +196,16 @@ const Header = () => {
           </Link>
 
           {/* 2. ADAPTED CENTER NAV (The "Pill") */}
-          <div className="hidden md:flex items-center gap-8 text-sm font-bold text-gray-500 bg-white/60 backdrop-blur-md px-8 py-3 rounded-full border border-white shadow-lg shadow-gray-200/50">
-            <div className="relative flex items-center" >
+          {/* 2. ADAPTED CENTER NAV (The "Pill") */}
+          <div className="hidden md:flex items-center gap-6 text-sm font-bold text-gray-500 bg-white/60 backdrop-blur-md px-6 py-2.5 rounded-full border border-white shadow-lg shadow-gray-200/50">
+            <div className="relative flex items-center">
               <AnimatePresence mode="wait">
                 {isSearchVisible ? (
                   <motion.div
                     initial={{ width: 0, opacity: 0 }}
                     animate={{ width: "auto", opacity: 1 }}
                     exit={{ width: 0, opacity: 0 }}
-                    className="flex items-center overflow-hidden"
+                    className="flex items-center gap-2 overflow-hidden"
                   >
                     <input
                       ref={searchInputRef}
@@ -234,9 +236,9 @@ const Header = () => {
                     initial={{ scale: 0.8 }}
                     animate={{ scale: 1 }}
                     onClick={handleSearchClick}
-                    className="hover:text-black transition-colors"
+                    className="hover:text-black transition-colors p-1"
                   >
-                    <Search className="w-4.5 h-4.5" />
+                    <Search className="w-4 h-4 cursor-pointer" />
                   </motion.button>
                 )}
               </AnimatePresence>
@@ -264,7 +266,6 @@ const Header = () => {
 
                         navigate(INTERVIEW_SEARCH_ITEM.path);
                       }}
-
                       className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
                     >
                       <div className="text-sm font-bold text-gray-900">
@@ -296,7 +297,6 @@ const Header = () => {
 
                             navigate(`/services/learn-and-perform/${course._id}`);
                           }}
-
                           className="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
                         >
                           {course.name || course.title}
@@ -310,21 +310,17 @@ const Header = () => {
 
             <div className="h-4 w-px bg-gray-200"></div>
 
-            <ScrollLink to="about" smooth={true} duration={600} offset={-80} className="cursor-pointer hover:text-black transition-all">
+            <ScrollLink to="about" smooth={true} duration={600} offset={-80} className="cursor-pointer hover:text-black transition-all whitespace-nowrap">
               About
             </ScrollLink>
-            <ScrollLink to="explore" smooth={true} duration={600} offset={-80} className="cursor-pointer hover:text-black transition-all">
+            <ScrollLink to="explore" smooth={true} duration={600} offset={-80} className="cursor-pointer hover:text-black transition-all whitespace-nowrap">
               Explore
             </ScrollLink>
-            <ScrollLink to="faqs" smooth={true} duration={600} offset={-80} className="cursor-pointer hover:text-black transition-all">
+            <ScrollLink to="faqs" smooth={true} duration={600} offset={-80} className="cursor-pointer hover:text-black transition-all whitespace-nowrap">
               FAQS
             </ScrollLink>
 
-            <div className="flex items-center gap-4 pl-2 border-l border-gray-200">
-              <button onClick={handleMuteClick} className="hover:text-black transition-colors">
-                {isMuted ? <VolumeX className="w-4.5 h-4.5" /> : <Volume2 className="w-4.5 h-4.5" />}
-              </button>
-
+            <div className="flex items-center gap-4 pl-4 ml-2 border-l border-gray-200">
               {/* ✅ NOTIFICATION BELL ICON */}
               <div className="relative">
                 <button
@@ -336,9 +332,9 @@ const Header = () => {
                       }
                     }
                   }}
-                  className="relative hover:text-black transition-colors"
+                  className="relative hover:text-black transition-colors p-1"
                 >
-                  <Bell className="w-4.5 h-4.5" />
+                  <Bell className="w-4 h-4 cursor-pointer" />
 
                   {isAuthenticated && unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
@@ -424,7 +420,7 @@ const Header = () => {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handleProfileClick}
-                  className="flex items-center gap-2 bg-white/80 border border-white shadow-sm pl-1 pr-3 py-1 rounded-full hover:shadow-md transition-all backdrop-blur-sm"
+                  className="flex items-center gap-2 bg-white/80 border border-white shadow-sm pl-1 pr-3 py-1 rounded-full hover:shadow-md transition-all backdrop-blur-sm cursor-pointer"
                 >
                   <img
                     src={user?.profilePic || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(getInitialsSeed(user?.name))}`}
@@ -442,11 +438,11 @@ const Header = () => {
                       exit={{ opacity: 0, y: 15, scale: 0.95 }}
                       className="absolute right-0 mt-3 w-56 bg-white/90 backdrop-blur-2xl border border-white rounded-[1.5rem] shadow-2xl overflow-hidden z-50 p-2"
                     >
-                      <button onClick={handleDashboardClick} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50 rounded-xl transition-colors">
+                      <button onClick={handleDashboardClick} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer">
                         <LayoutDashboard className="w-4 h-4 text-gray-400" /> Dashboard
                       </button>
                       <div className="h-px bg-gray-100 my-1 mx-2"></div>
-                      <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50 rounded-xl transition-colors">
+                      <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50 rounded-xl transition-colors cursor-pointer">
                         <LogOut className="w-4 h-4" /> Logout
                       </button>
                     </motion.div>

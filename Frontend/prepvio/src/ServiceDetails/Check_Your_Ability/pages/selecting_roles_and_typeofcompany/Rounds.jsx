@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, PlayCircle, CheckCircle2, Clock, Sparkles } from "lucide-react";
+import { ArrowLeft, PlayCircle, CheckCircle2, Clock, Sparkles, X, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "../../../../store/authstore.js";
 import PlanBlockModal from "../../../../components/PlanBlockModal.jsx";
@@ -9,6 +9,7 @@ import PlanBlockModal from "../../../../components/PlanBlockModal.jsx";
 const Rounds = ({ companyType, role }) => {
   const [rounds, setRounds] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [cameraError, setCameraError] = useState(null); // Track camera permission errors
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [modalType, setModalType] = useState(null); // 'payment' | 'upgrade' | null
@@ -39,13 +40,21 @@ const Rounds = ({ companyType, role }) => {
       }
     };
 
-    if (companyType && role) fetchRounds();
-  }, [companyType, role]);
+    if (companyType && role) {
+      fetchRounds();
+    } else {
+      // If companyType or role is missing, go back to previous page
+      console.warn("⚠️ Missing companyType or role, going back to previous page");
+      navigate(-1);
+    }
+  }, [companyType, role, navigate]);
 
   const handleStartInterview = async () => {
     try {
+      setCameraError(null); // Clear any previous errors
+
       // Request camera permission
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       stream.getTracks().forEach((track) => track.stop());
 
       console.log("✅ Camera access granted");
@@ -74,15 +83,27 @@ const Rounds = ({ companyType, role }) => {
 
     } catch (error) {
       console.error("❌ Full error:", error);
-      console.error("❌ Error response:", error.response?.data); // ✅ ADD THIS
-      console.error("❌ Error status:", error.response?.status); // ✅ ADD THIS
+      console.error("❌ Error response:", error.response?.data);
+      console.error("❌ Error status:", error.response?.status);
 
-      if (error.name === 'NotAllowedError') {
-        alert("⚠️ Please allow camera access to continue.");
-      } else if (error.response?.status === 403) {
-        // ✅ HANDLE SUBSCRIPTION ERRORS
+      // ✅ Handle camera/microphone permission denial
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        setCameraError({
+          title: "Camera/Microphone Access Required",
+          message: "Please allow camera and microphone access to start the interview.",
+          instructions: [
+            "Click the camera icon in your browser's address bar",
+            "Select 'Allow' for camera and microphone",
+            "Click the button below to grant permission",
+            "Reload the page if needed"
+          ]
+        });
+        return;
+      }
+
+      // Handle other errors
+      if (error.response?.status === 403) {
         const data = error.response.data;
-
         console.log("🔒 403 Error data:", data);
 
         if (data.requiresPayment) {
@@ -92,16 +113,31 @@ const Rounds = ({ companyType, role }) => {
           setModalType('upgrade');
           setIsModalOpen(true);
         } else {
-          alert(`⚠️ ${data.message || 'Access denied'}`);
-          navigate("/dashboard/pricing");
+          setCameraError({
+            title: "Access Denied",
+            message: data.message || 'You do not have access to start an interview.',
+            instructions: ["Please check your subscription status or contact support."]
+          });
         }
       } else if (error.response) {
         console.error("Server error:", error.response.data);
-        alert(`Server Error: ${error.response.data.message || 'Unknown error'}`);
+        setCameraError({
+          title: "Server Error",
+          message: error.response.data.message || 'An error occurred on the server.',
+          instructions: ["Please try again or contact support if the issue persists."]
+        });
       } else if (error.request) {
-        alert("⚠️ No response from server. Check if backend is running.");
+        setCameraError({
+          title: "Connection Error",
+          message: "Unable to connect to the server.",
+          instructions: ["Please check your internet connection and try again."]
+        });
       } else {
-        alert("⚠️ An unexpected error occurred.");
+        setCameraError({
+          title: "Unexpected Error",
+          message: "An unexpected error occurred.",
+          instructions: ["Please refresh the page and try again."]
+        });
       }
     }
   };
@@ -326,7 +362,6 @@ const Rounds = ({ companyType, role }) => {
             className="flex items-center gap-0 group cursor-pointer"
           >
             <span className="bg-[#1A1A1A] text-white px-8 py-4 rounded-l-full font-bold text-lg shadow-xl shadow-gray-300/50 z-10 relative flex items-center gap-2">
-              {/* <PlayCircle size={20} /> */}
               Start Practice Interview
             </span>
             <motion.span
@@ -356,12 +391,87 @@ const Rounds = ({ companyType, role }) => {
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-[#D4F478]" />
             <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-              Step 2 of 2
+              Step 3 of 3
             </span>
             <div className="w-2 h-2 rounded-full bg-gray-300" />
           </div>
         </motion.div>
       </motion.div>
+
+      {/* Camera Permission Modal - Popup Style */}
+      <AnimatePresence>
+        {cameraError && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setCameraError(null)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            >
+              {/* Modal */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] shadow-2xl border-2 border-[#D4F478]/30 p-8 md:p-10 max-w-md w-full relative overflow-hidden"
+              >
+                {/* Decorative elements */}
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#D4F478]/20 rounded-full blur-3xl" />
+                <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-purple-200/30 rounded-full blur-3xl" />
+
+                {/* Close button */}
+                <button
+                  onClick={() => setCameraError(null)}
+                  className="absolute top-6 right-6 px-4 py-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors z-10 cursor-pointer font-bold text-sm text-gray-600 hover:text-gray-900"
+                >
+                  Close
+                </button>
+
+                {/* Content */}
+                <div className="relative z-10 space-y-6">
+                  {/* Icon */}
+                  <div className="flex justify-center">
+                    <div className="w-16 h-16 bg-[#D4F478]/20 rounded-2xl flex items-center justify-center">
+                      <AlertCircle className="w-8 h-8 text-[#1A1A1A]" />
+                    </div>
+                  </div>
+
+                  {/* Title */}
+                  <div className="text-center space-y-2">
+                    <h3 className="text-2xl font-black text-gray-900">
+                      {cameraError.title}
+                    </h3>
+                    <p className="text-gray-600 text-base leading-relaxed">
+                      {cameraError.message}
+                    </p>
+                  </div>
+
+                  {/* Instructions */}
+                  {cameraError.instructions && cameraError.instructions.length > 0 && (
+                    <div className="bg-[#D4F478]/10 rounded-2xl p-5 space-y-3">
+                      <p className="text-sm font-bold text-gray-900">How to fix:</p>
+                      <ul className="space-y-2">
+                        {cameraError.instructions.map((instruction, idx) => (
+                          <li key={idx} className="text-sm text-gray-700 flex items-start gap-3">
+                            <span className="flex-shrink-0 w-5 h-5 bg-[#D4F478] rounded-full flex items-center justify-center text-[#1A1A1A] font-bold text-xs mt-0.5">
+                              {idx + 1}
+                            </span>
+                            <span className="flex-1">{instruction}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                </div>
+              </motion.div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Plan Block Modal */}
       <PlanBlockModal
@@ -375,156 +485,3 @@ const Rounds = ({ companyType, role }) => {
 };
 
 export default Rounds;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// ---- actual correct working code below ----
-// import React, { useEffect, useState } from "react";
-// import axios from "axios";
-// import { useNavigate } from "react-router-dom";
-// import { ArrowLeft, PlayCircle } from "lucide-react";
-
-// const Rounds = ({ companyType, role }) => {
-//   const [rounds, setRounds] = useState([]);
-//   const [loading, setLoading] = useState(true);
-//   const navigate = useNavigate();
-
-//   useEffect(() => {
-//     const fetchRounds = async () => {
-//       try {
-//         const res = await axios.get(
-//           `/api/companies/${encodeURIComponent(
-//             companyType
-//           )}/${encodeURIComponent(role)}/rounds`
-//         );
-//         setRounds(res.data.rounds || []);
-//       } catch (err) {
-//         console.error("Error fetching rounds:", err);
-//       } finally {
-//         setLoading(false);
-//       }
-//     };
-
-//     if (companyType && role) fetchRounds();
-//   }, [companyType, role]);
-
-//   const handleStartInterview = async () => {
-//     try {
-//       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-//       stream.getTracks().forEach((track) => track.stop());
-
-//       const res = await axios.post(
-//         "/api/interview-session/start",
-//         { companyType, role },
-//         { withCredentials: true }
-//       );
-
-//       const sessionId = res.data.sessionId;
-
-//       navigate("/services/check-your-ability/interview", {
-//         state: {
-//           companyType,
-//           role,
-//           rounds,
-//           sessionId,
-//           preventBack: true,
-//         },
-//         replace: true,
-//       });
-//     } catch (error) {
-//       console.error(error);
-//       alert("⚠️ Please allow camera access or login again.");
-//     }
-//   };
-
-//   if (loading) {
-//     return (
-//       <div className="min-h-screen flex items-center justify-center text-gray-600 text-lg">
-//         Loading interview rounds…
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-blue-100 p-6 flex items-center justify-center">
-//       <div className="w-full max-w-3xl bg-white/40 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 p-10 space-y-10">
-
-//         {/* Header */}
-//         <div className="text-center space-y-2">
-//           <h1 className="text-3xl font-bold text-gray-900">
-//             Interview Rounds
-//           </h1>
-//           <p className="text-gray-600 text-base">
-//             Practice interview for{" "}
-//             <span className="font-semibold text-indigo-600">
-//               {companyType}
-//             </span>{" "}
-//             -{" "}
-//             <span className="font-semibold text-indigo-600">
-//               {role}
-//             </span>
-//           </p>
-//         </div>
-
-//         {/* Rounds List */}
-//         <div className="space-y-4">
-//           {rounds.length > 0 ? (
-//             rounds.map((round, index) => (
-//               <div
-//                 key={index}
-//                 className="bg-white/60 backdrop-blur-lg border border-white/50 rounded-xl p-5 shadow hover:shadow-lg transition"
-//               >
-//                 <h3 className="text-lg font-semibold text-indigo-700 mb-1">
-//                   {round.name}
-//                 </h3>
-//                 <p className="text-gray-700 text-sm leading-relaxed">
-//                   {round.description}
-//                 </p>
-//               </div>
-//             ))
-//           ) : (
-//             <p className="text-center text-gray-500 italic">
-//               No rounds configured for this role.
-//             </p>
-//           )}
-//         </div>
-
-//         {/* Actions */}
-//         <div className="flex flex-col sm:flex-row gap-4 justify-between pt-6 border-t border-white/50">
-//           <button
-//             onClick={() => navigate(-1)}
-//             className="flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-gray-400 text-gray-700 bg-white hover:bg-gray-100 transition"
-//           >
-//             <ArrowLeft size={18} />
-//             Change Selection
-//           </button>
-
-//           <button
-//             onClick={handleStartInterview}
-//             className="flex items-center justify-center gap-2 px-8 py-3 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg hover:scale-[1.03] transition"
-//           >
-//             <PlayCircle size={20} />
-//             Start Practice Interview
-//           </button>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default Rounds;

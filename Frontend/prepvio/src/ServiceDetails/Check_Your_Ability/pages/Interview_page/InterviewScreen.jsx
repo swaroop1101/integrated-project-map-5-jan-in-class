@@ -601,6 +601,7 @@ function DynamicModel({ speechText, onSpeechEnd, ...props }) {
   const offsetX = useRef(Math.random() * 0.05);
 
   useFrame((state) => {
+    if (!speechText) return;
     const t = state.clock.getElapsedTime();
 
     if (headBoneRef.current) {
@@ -720,6 +721,7 @@ const InterviewScreen = ({
   const screenRef = useRef(null);
   const chatEndRef = useRef(null);
   const recognitionRef = useRef(null);
+  const captureCanvasRef = useRef(null);
   const speechBufferRef = useRef("");
   const location = useLocation();
   const highlightBufferRef = useRef([]);
@@ -846,7 +848,8 @@ const InterviewScreen = ({
 
 
 
-  const captureFrame = () => {
+  // Replace lines 561-597 with this optimized version:
+  const captureFrame = useCallback(() => {
     const video = userVideoRef.current;
 
     if (
@@ -858,17 +861,33 @@ const InterviewScreen = ({
       return null;
     }
 
-    const canvas = document.createElement("canvas");
-    // Reduce resolution significantly for faster processing
-    canvas.width = Math.min(video.videoWidth, 320);
-    canvas.height = Math.min(video.videoHeight, 240);
+    if (!captureCanvasRef.current) {
+      captureCanvasRef.current = document.createElement("canvas");
+    }
+    const canvas = captureCanvasRef.current;
 
-    const ctx = canvas.getContext("2d", { willReadFrequently: false });
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const targetWidth = 160;
+    const targetHeight = 120;
 
-    // Lower quality significantly for faster encoding
-    return canvas.toDataURL("image/jpeg", 0.3);
-  };
+    if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+    }
+
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+    // Use requestAnimationFrame for smoother rendering
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => {
+        ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
+        canvas.toBlob(
+          (blob) => resolve(blob),
+          "image/jpeg",
+          0.2
+        );
+      });
+    });
+  }, []);
 
   const endInterview = useCallback(() => {
     console.log("Interview ended and resources cleaned.");
@@ -918,6 +937,7 @@ const InterviewScreen = ({
     }
   }, [isPreview, previewSession]);
 
+  // ✅ OPTIMIZED NERVOUSNESS DETECTION - Re-enabled with performance optimizations
   useEffect(() => {
     const sessionId = location.state?.sessionId;
 
@@ -926,70 +946,144 @@ const InterviewScreen = ({
       return;
     }
 
-    console.log("📹 Starting nervousness detection for session:", sessionId);
+    console.log("📹 Starting OPTIMIZED nervousness detection for session:", sessionId);
 
     let frameCount = 0;
     let successCount = 0;
     let errorCount = 0;
+    let isProcessing = false;
+
+    // ✅ Use very small resolution for nervousness detection (80x60)
+    let offscreenCanvas;
+    let offscreenCtx;
+
+    if (typeof OffscreenCanvas !== 'undefined') {
+      offscreenCanvas = new OffscreenCanvas(80, 60);
+      offscreenCtx = offscreenCanvas.getContext('2d', {
+        willReadFrequently: false,
+        desynchronized: true,
+        alpha: false
+      });
+    } else {
+      offscreenCanvas = document.createElement('canvas');
+      offscreenCanvas.width = 80;
+      offscreenCanvas.height = 60;
+      offscreenCtx = offscreenCanvas.getContext('2d', {
+        willReadFrequently: false,
+        desynchronized: true,
+        alpha: false
+      });
+    }
 
     const interval = setInterval(() => {
-      frameCount++;
-
-      const frame = captureFrame();
-
-      if (!frame) {
-        console.warn(`⚠️ Frame ${frameCount}: Capture returned null`);
+      if (isProcessing) {
+        console.log("⏭️ Skipping frame - still processing");
         return;
       }
 
-      fetch("http://127.0.0.1:5050/analyze-frame", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId: sessionId,
-          frame: frame,
-          questionIndex: currentQuestionIndex
-        })
-      })
-        .then(res => {
-          if (!res.ok) {
-            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-          }
-          return res.json();
-        })
-        .then(data => {
-          successCount++;
+      const video = userVideoRef.current;
+      if (!video || video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
+        return;
+      }
 
-          if (data.nervous && data.imageUrl) {
-            highlightBufferRef.current.push({
-              questionIndex: currentQuestionIndex,
-              questionText: currentQuestionText,
-              nervousScore: data.score,
-              confidence: data.confidence,
-              imageUrl: data.imageUrl,
-              timestamp: new Date().toLocaleTimeString(),
-              capturedAt: new Date(),
-            });
+      frameCount++;
+      isProcessing = true;
 
-            console.log(
-              `🟡 Highlight appended for Q${currentQuestionIndex}`,
-              data.imageUrl
-            );
-          }
-        })
-        .catch(err => {
-          errorCount++;
-          console.error(`❌ Frame ${frameCount} failed:`, err.message);
+      const processFrame = () => {
+        try {
+          // Draw tiny resolution for nervousness detection
+          offscreenCtx.drawImage(video, 0, 0, 80, 60);
 
-          if (errorCount % 10 === 0) {
-            console.warn(`📊 Stats: ${successCount} success, ${errorCount} errors out of ${frameCount} frames`);
-          }
-        });
-    }, 1000);
+          const blobPromise = offscreenCanvas.convertToBlob ?
+            offscreenCanvas.convertToBlob({ type: 'image/jpeg', quality: 0.15 }) :
+            new Promise(resolve => offscreenCanvas.toBlob(resolve, 'image/jpeg', 0.15));
+
+          blobPromise.then(processBlob).catch(err => {
+            console.error("Blob creation error:", err);
+            isProcessing = false;
+          });
+        } catch (err) {
+          console.error("Frame capture error:", err);
+          isProcessing = false;
+        }
+      };
+
+      const processBlob = async (blob) => {
+        if (!blob) {
+          isProcessing = false;
+          return;
+        }
+
+        try {
+          const reader = new FileReader();
+          reader.onloadend = async () => {
+            const base64data = reader.result.split(',')[1];
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            try {
+              const res = await fetch("http://127.0.0.1:5050/analyze-frame", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  sessionId: sessionId,
+                  frame: base64data,
+                  questionIndex: currentQuestionIndex
+                }),
+                signal: controller.signal
+              });
+
+              clearTimeout(timeoutId);
+
+              if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+              }
+
+              const data = await res.json();
+              successCount++;
+
+              if (data.nervous && data.imageUrl) {
+                highlightBufferRef.current.push({
+                  questionIndex: currentQuestionIndex,
+                  questionText: currentQuestionText,
+                  nervousScore: data.score,
+                  confidence: data.confidence,
+                  imageUrl: data.imageUrl,
+                  timestamp: new Date().toLocaleTimeString(),
+                  capturedAt: new Date(),
+                });
+
+                console.log(`🟡 Nervous moment detected Q${currentQuestionIndex}`);
+              }
+            } catch (err) {
+              clearTimeout(timeoutId);
+              errorCount++;
+              if (err.name !== 'AbortError') {
+                console.error(`❌ Frame ${frameCount} analysis failed`);
+              }
+            } finally {
+              isProcessing = false;
+            }
+          };
+
+          reader.readAsDataURL(blob);
+        } catch (err) {
+          console.error("Blob processing error:", err);
+          isProcessing = false;
+        }
+      };
+
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(processFrame, { timeout: 2000 });
+      } else {
+        setTimeout(processFrame, 0);
+      }
+
+    }, 10000); // ✅ 10 seconds - much less frequent to prevent lag
 
     return () => {
       clearInterval(interval);
-      console.log(`📹 Detection stopped. Final stats: ${successCount} success, ${errorCount} errors out of ${frameCount} frames`);
+      console.log(`📹 Detection stopped. Stats: ${successCount}/${frameCount} analyzed`);
 
       fetch("http://127.0.0.1:5050/cleanup-session", {
         method: "POST",
@@ -1777,11 +1871,25 @@ In the meantime, if you have any follow-up questions, please don't hesitate to r
     const startCamera = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
+          video: {
+            // ✅ Balanced resolution - good quality without overloading GPU
+            width: { ideal: 480 },
+            height: { ideal: 360 },
+            frameRate: { ideal: 30, max: 30 },
+            facingMode: "user"
+          },
           audio: true,
         });
+
+        window.currentMediaStream = stream;
         setCameraAllowed(true);
-        userVideoRef.current.srcObject = stream;
+
+        // ✅ Set video element immediately
+        if (userVideoRef.current) {
+          userVideoRef.current.srcObject = stream;
+          const settings = stream.getVideoTracks()[0].getSettings();
+          console.log("📹 Video initialized:", `${settings.width}x${settings.height} @ ${settings.frameRate}fps`);
+        }
       } catch (err) {
         setError("Camera/Mic access denied.");
       }
@@ -1901,7 +2009,13 @@ Key points:
                   autoPlay
                   playsInline
                   muted
-                  className="w-full h-[480px] object-cover scale-x-[-1]"
+                  className="w-full h-[480px] object-cover"
+                  style={{
+                    transform: 'scaleX(-1) translateZ(0)',
+                    backfaceVisibility: 'hidden',
+                    WebkitBackfaceVisibility: 'hidden',
+                    imageRendering: 'auto',
+                  }}
                 />
               )}
 

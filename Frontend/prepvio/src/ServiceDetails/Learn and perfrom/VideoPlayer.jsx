@@ -13,9 +13,14 @@ import {
   MonitorPlay,
   AlertCircle,
   Sparkles,
-  ChevronRight
+
+  ChevronRight,
+  LayoutDashboard,
+  LogOut
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import UserAvatar from "../../components/UserAvatar.jsx";
+import { useAuthStore } from "../../store/authstore.js";
 
 const youtubeaxios = axios.create({
   withCredentials: false,
@@ -24,33 +29,139 @@ const youtubeaxios = axios.create({
 /* ======================================================
    CONFIG
 ====================================================== */
-const BASE_URL = "/api";
-const USER_API = "/api";
+const BASE_URL = "http://localhost:8000/api";
+const USER_API = "http://localhost:5000/api";
 const YOUTUBE_API_KEY = "AIzaSyBs569PnYQUNFUXon5AMersGFuKS8aS1QQ";
 
 /* ======================================================
    UI COMPONENTS (Modern Design)
 ====================================================== */
 
-// Updated Channel Card
-const ChannelCard = ({ name, imageUrl }) => (
-  <div className="bg-white/60 backdrop-blur-md rounded-[2rem] p-6 mb-6 flex items-center space-x-5 shadow-sm border border-white/50 transition-all hover:shadow-md">
-    <div className="w-16 h-16 rounded-full overflow-hidden shadow-md ring-4 ring-white flex-shrink-0 bg-gray-100">
-      <img
-        src={imageUrl || "/fallback.jpg"}
-        alt={name}
-        className="w-full h-full object-cover"
-        onError={(e) => { e.target.src = "https://placehold.co/100x100?text=CH"; }}
-      />
-    </div>
-    <div className="min-w-0 flex-1">
-      <div className="text-xl font-black text-gray-900 line-clamp-1">{name || "Channel Name"}</div>
-      <div className="mt-1 text-sm font-bold text-indigo-600 cursor-pointer hover:underline flex items-center gap-1">
-        <Layers className="w-3 h-3" /> View Notes
+// Updated Channel Card with Local Storage Notes Management
+const ChannelCard = ({ name, imageUrl, selectedVideoId, channelId, courseId }) => {
+  const [notesLink, setNotesLink] = useState('');
+  const [savedNotesLink, setSavedNotesLink] = useState('');
+  const [showInput, setShowInput] = useState(false);
+
+  // Load saved notes link from localStorage
+  useEffect(() => {
+    if (!selectedVideoId) return;
+
+    const storageKey = `video-notes-${selectedVideoId}`;
+    const saved = localStorage.getItem(storageKey);
+
+    if (saved) {
+      setSavedNotesLink(saved);
+    } else {
+      setSavedNotesLink('');
+    }
+  }, [selectedVideoId]);
+
+  const openNewGoogleDoc = () => {
+    window.open('https://docs.google.com/document/create', '_blank');
+  };
+
+  const openSavedNotes = () => {
+    if (savedNotesLink) {
+      window.open(savedNotesLink, '_blank');
+    }
+  };
+
+  const handleSaveNotesLink = () => {
+    if (!notesLink.trim() || !selectedVideoId) return;
+
+    // Basic validation for Google Docs URL
+    if (!notesLink.includes('docs.google.com')) {
+      alert('Please enter a valid Google Docs link');
+      return;
+    }
+
+    const storageKey = `video-notes-${selectedVideoId}`;
+    localStorage.setItem(storageKey, notesLink.trim());
+
+    setSavedNotesLink(notesLink.trim());
+    setNotesLink('');
+    setShowInput(false);
+  };
+
+  return (
+    <div className="bg-white/60 backdrop-blur-md rounded-[2rem] p-6 mb-6 shadow-sm border border-white/50 transition-all hover:shadow-md">
+      <div className="flex items-center space-x-5 mb-4">
+        <div className="w-16 h-16 rounded-full overflow-hidden shadow-md ring-4 ring-white flex-shrink-0 bg-gray-100">
+          <img
+            src={imageUrl || "/fallback.jpg"}
+            alt={name}
+            className="w-full h-full object-cover"
+            onError={(e) => { e.target.src = "https://placehold.co/100x100?text=CH"; }}
+          />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-xl font-black text-gray-900 line-clamp-1">{name || "Channel Name"}</div>
+          <div
+            onClick={openNewGoogleDoc}
+            className="mt-1 text-sm font-bold text-indigo-600 cursor-pointer hover:underline flex items-center gap-1"
+          >
+            <Layers className="w-3 h-3" /> Create New Notes
+          </div>
+        </div>
       </div>
+
+      {/* Saved Notes Link */}
+      {savedNotesLink && (
+        <div className="mb-3 p-3 bg-green-50 rounded-xl border border-green-200">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-green-700 uppercase tracking-wider">Saved Notes</span>
+            <button
+              onClick={openSavedNotes}
+              className="text-xs font-bold text-green-600 hover:text-green-800 underline flex items-center gap-1"
+            >
+              Open Notes <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Update Notes Link */}
+      {!showInput ? (
+        <button
+          onClick={() => setShowInput(true)}
+          className="w-full py-2 px-4 bg-indigo-50 text-indigo-600 rounded-xl text-sm font-bold hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2"
+        >
+          <Layers className="w-4 h-4" />
+          {savedNotesLink ? 'Update Notes Link' : 'Save Notes Link'}
+        </button>
+      ) : (
+        <div className="space-y-2">
+          <input
+            type="text"
+            value={notesLink}
+            onChange={(e) => setNotesLink(e.target.value)}
+            placeholder="Paste your Google Docs link here..."
+            className="w-full px-4 py-2 border-2 border-indigo-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400 transition-colors"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={handleSaveNotesLink}
+              disabled={!notesLink.trim()}
+              className="flex-1 py-2 px-4 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => {
+                setShowInput(false);
+                setNotesLink('');
+              }}
+              className="px-4 py-2 bg-gray-100 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 // Updated Playlist Item with Progress
 const PlayListItem = ({ video, index, duration, onVideoSelect, isPlaying, videoProgress }) => {
@@ -225,10 +336,16 @@ const PlayListPlayer = ({ video, onPlayerReady, onStateChange, onWatchLater, isS
 };
 
 // Sidebar Component
-const PlayListSidebar = ({ videos, durations, onVideoSelect, selectedVideoId, channelData, videoProgress }) => {
+const PlayListSidebar = ({ videos, durations, onVideoSelect, selectedVideoId, channelData, videoProgress, channelId, courseId }) => {
   return (
     <div className="w-full lg:w-[32%] flex flex-col h-full mt-8 lg:mt-0">
-      <ChannelCard name={channelData?.name} imageUrl={channelData?.imageUrl} />
+      <ChannelCard
+        name={channelData?.name}
+        imageUrl={channelData?.imageUrl}
+        selectedVideoId={selectedVideoId}
+        channelId={channelId}
+        courseId={courseId}
+      />
 
       <div className="bg-white/50 backdrop-blur-xl border border-white rounded-[2.5rem] p-5 shadow-lg flex-1 flex flex-col min-h-[400px] max-h-[600px] lg:max-h-[calc(100vh-120px)] relative overflow-hidden">
         {/* Decorative elements */}
@@ -377,6 +494,37 @@ export default function VideoPlayer() {
   const [searchParams] = useSearchParams();
   const targetVideoId = searchParams.get("video");
   const navigate = useNavigate();
+
+  const { user, logout, isAuthenticated } = useAuthStore();
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const profileDropdownRef = useRef(null);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
+  };
+
+  const handleDashboardClick = () => {
+    navigate("/dashboard");
+    setIsProfileDropdownOpen(false);
+  };
+
+  const handleProfileClick = () => {
+    setIsProfileDropdownOpen(!isProfileDropdownOpen);
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
+        setIsProfileDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // Playlist & Video State
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
@@ -1010,37 +1158,70 @@ export default function VideoPlayer() {
      RENDER
   ====================================================== */
   return (
-    <div className="min-h-screen bg-[#FDFBF9] font-sans selection:bg-[#D4F478] selection:text-black overflow-x-hidden relative">
+    <div className="min-h-screen bg-[#FDFBF9] font-sans selection:bg-[#D4F478] selection:text-black pb-20 relative overflow-x-hidden">
       {/* GLOBAL BACKGROUND BLOBS */}
       <div className="fixed inset-0 pointer-events-none -z-50">
         <div className="absolute top-[-10%] right-[-5%] w-[60vw] h-[60vw] bg-gradient-to-b from-blue-50 to-transparent rounded-full blur-[120px] opacity-60" />
         <div className="absolute bottom-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-gradient-to-t from-pink-50 to-transparent rounded-full blur-[120px] opacity-60" />
       </div>
 
-      <div className="max-w-[1600px] mx-auto p-4 md:p-8 relative z-10">
-        {/* Navigation */}
-        {/* <div className="mb-8 flex items-center">
+      <div className="max-w-[1600px] mx-auto px-4 md:px-6 py-6 md:py-8">
+
+        {/* COMBINED NAVIGATION BAR - Back Button + User Avatar */}
+        <div className="flex items-center justify-between mb-8 relative z-50">
+          {/* Back Button */}
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-gray-500 hover:text-black font-bold transition-all group bg-white/80 backdrop-blur-md px-5 py-2.5 rounded-full border border-white shadow-sm hover:shadow-md"
+            className="flex items-center gap-2 text-gray-500 hover:text-black font-bold transition-colors group"
           >
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            Back
+            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-gray-100 shadow-sm group-hover:shadow-md transition-all">
+              <ArrowLeft className="w-5 h-5" />
+            </div>
+            <span className="hidden sm:inline">Back</span>
           </button>
-        </div> */}
 
-        {/* Content */}
+          {/* User Avatar / Sign In Button */}
+          {isAuthenticated && user ? (
+            <div className="relative" ref={profileDropdownRef}>
+              <UserAvatar
+                image={user.profilePic || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}`}
+                name={user.name}
+                onClick={handleProfileClick}
+              />
+              <AnimatePresence>
+                {isProfileDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 15, scale: 0.95 }}
+                    className="absolute right-0 mt-3 w-56 bg-white/90 backdrop-blur-2xl border border-white rounded-[1.5rem] shadow-2xl overflow-hidden z-50 p-2"
+                  >
+                    <button onClick={handleDashboardClick} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer">
+                      <LayoutDashboard className="w-4 h-4 text-gray-400" /> Dashboard
+                    </button>
+                    <div className="h-px bg-gray-100 my-1 mx-2"></div>
+                    <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50 rounded-xl transition-colors cursor-pointer">
+                      <LogOut className="w-4 h-4" /> Logout
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <button onClick={() => navigate('/login')} className="px-6 py-2 bg-black text-white rounded-full font-bold text-sm hover:bg-gray-800 transition-colors">
+              Sign In
+            </button>
+          )}
+        </div>
+
         <div className="flex flex-col lg:flex-row gap-8">
+          {/* Main Content Area */}
           <PlayListPlayer
             video={selectedVideo}
             onPlayerReady={handlePlayerReady}
             onStateChange={handleStateChange}
             onWatchLater={handleWatchLater}
-            isSaved={savedVideoIds.has(
-              selectedVideo?.snippet?.resourceId?.videoId ||
-              selectedVideo?.id
-            )}
-
+            isSaved={savedVideoIds.has(selectedVideoId)}
             isSaving={isSaving}
           />
           <PlayListSidebar
@@ -1055,6 +1236,8 @@ export default function VideoPlayer() {
               }
             }
             videoProgress={videoProgress}
+            channelId={channelId}
+            courseId={courseId}
           />
         </div>
       </div>
