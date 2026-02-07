@@ -345,6 +345,13 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
+    userId: {
+      type: String,
+      unique: true,
+      sparse: true, // Allows null/undefined for existing users
+      trim: true,
+    },
+
     password: {
       type: String,
       required: true,

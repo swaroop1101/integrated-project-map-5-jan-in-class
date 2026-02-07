@@ -41,6 +41,8 @@ import Aptitude from "./ServiceDetails/Check_Your_Ability/pages/Aptitude/Aptitud
 
 import Feedback from "./Dashboard/Feedback.jsx";
 import AptitudeReviewMode from "./Dashboard/AptitudeReviewMode.jsx";
+import Tickets from "./Dashboard/Tickets.jsx";
+import TicketDetail from "./Dashboard/TicketDetail.jsx";
 
 import RazorpayTest from "./pricing/RazorpayTest.jsx";
 
@@ -167,6 +169,8 @@ function App() {
 					<Route path="interview-analysis" element={<Interview />} />
 					<Route path="pricing" element={<Payment />} />
 					<Route path="messages/inbox" element={<Message />} />
+					<Route path="tickets" element={<Tickets />} />
+					<Route path="tickets/:ticketId" element={<TicketDetail />} />
 					<Route path="help/faq" element={<FAQs />} />
 					<Route path="feedback" element={<Feedback />} />
 					<Route path="aptitude-test-analysis" element={<AptitudeTestAnalysis />} />

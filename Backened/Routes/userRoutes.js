@@ -1,8 +1,10 @@
-// import express from "express";
-// import { User } from "../models/User.js";
-// import { verifyToken } from "../middleware/verifytoken.js";
+import express from "express";
+import { User } from "../models/User.js";
+import { verifyToken } from "../middleware/verifytoken.js";
+import { sendCourseStartedNotification, sendCourseCompletedNotification } from "../Utils/notificationHelper.js";
+import { deduplicateCourseProgress } from "../Utils/courseHelper.js";
 
-// const router = express.Router();
+const router = express.Router();
 
 // /* =========================================================
 //    PROFILE
@@ -415,29 +417,47 @@
 
 
 
-// /* =========================================================
-//    ADMIN: GET ALL USERS (FOR USER MANAGEMENT)
-// ========================================================= */
-// router.get("/admin/all-users", async (req, res) => {
-//   try {
-//     const users = await User.find({})
-//       .select("firstName lastName email isVerified createdAt");
+/* =========================================================
+   ADMIN: GET ALL USERS (FOR USER MANAGEMENT)
+========================================================= */
+router.get("/admin/all-users", verifyToken, async (req, res) => {
+  try {
+    const users = await User.find({})
+      .select("name email role createdAt lastLogin");
 
-//     res.json({
-//       success: true,
-//       data: users.map(u => ({
-//         id: u._id,
-//         name: `${u.firstName} ${u.lastName}`,
-//         email: u.email,
-//         featureAccess: "All Features", // placeholder (backend not ready)
-//         status: u.isVerified ? "Active" : "Suspended"
-//       }))
-//     });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: "Failed to fetch users" });
-//   }
-// });
+    res.json({
+      success: true,
+      data: users.map(u => ({
+        id: u._id,
+        name: u.name,
+        email: u.email,
+        role: u.role || "User",
+        status: "Active", // Placeholder
+        joinDate: u.createdAt
+      }))
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch users" });
+  }
+});
+
+/* =========================================================
+   ADMIN: DELETE USER
+========================================================= */
+router.delete("/admin/delete/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findByIdAndDelete(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    res.json({ success: true, message: "User deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to delete user" });
+  }
+});
 
 // /* =========================================================
 //    ADMIN: FULL USER LEARNING DETAILS
@@ -651,14 +671,6 @@
 
 
 // export default router;
-
-import express from "express";
-import { User } from "../models/User.js";
-import { verifyToken } from "../middleware/verifytoken.js";
-import { sendCourseStartedNotification, sendCourseCompletedNotification } from "../Utils/notificationHelper.js";
-import { deduplicateCourseProgress } from "../Utils/courseHelper.js";
-
-const router = express.Router();
 
 /* =========================================================
    GET COMPLETED COURSES
@@ -1725,6 +1737,23 @@ router.get("/aptitude/latest", verifyToken, async (req, res) => {
   } catch (err) {
     console.error("Fetch latest aptitude error:", err);
     res.status(500).json({ message: "Failed to fetch latest aptitude attempt" });
+  }
+});
+
+/* =========================================================
+   ADMIN: DELETE USER
+========================================================= */
+router.delete("/admin/delete/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findByIdAndDelete(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    res.status(200).json({ success: true, message: "User deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to delete user" });
   }
 });
 

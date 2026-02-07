@@ -28,8 +28,11 @@ import verifyPayment from "./Routes/paymentRoute.js";
 import promoCodeRoutes from "./Routes/promoCodeRoute.js";
 
 import chatRoutes from "./Routes/chatRoutes.js";
+import ticketRoutes from "./Routes/ticketRoutes.js";
 import aiRoutes from "./Routes/aiRoutes.js";
 import projectSubmissionRoutes from "./Routes/ProjectSubmission.route.js";
+import revenueRoutes from "./Routes/revenueRoutes.js";
+import employeeRoutes from "./Routes/employeeRoutes.js";
 
 const nervousCaptures = new Map();
 import fs from "fs";
@@ -55,8 +58,11 @@ app.use("/api/interview-session", interviewSessionRoutes);
 app.use(passport.initialize());
 app.use("/api/payment", verifyPayment);
 app.use("/api/chat", chatRoutes);
+app.use("/api/tickets", ticketRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/project-submissions", projectSubmissionRoutes);
+app.use("/api/revenue", revenueRoutes);
+app.use("/api/employees", employeeRoutes);
 
 // Attach socket.io to request object
 app.use((req, res, next) => {
