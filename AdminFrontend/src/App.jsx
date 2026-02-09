@@ -54,6 +54,7 @@ import Privacy from "./pages/Settings/Privacy.jsx";
 import SystemPreferences from "./pages/Settings/SystemPreferences.jsx";
 import Integrations from "./pages/Settings/Integrations.jsx";
 import BillingSettings from "./pages/Settings/BillingSettings.jsx";
+import AdminLogin from "./pages/AdminLogin.jsx";
 
 export default function App() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -62,7 +63,7 @@ export default function App() {
   useEffect(() => {
     const token = searchParams.get("token");
     if (token) {
-      localStorage.setItem("ADMIN_AUTH_TOKEN", token);
+      localStorage.setItem("adminToken", token);
       // Remove token from URL
       searchParams.delete("token");
       setSearchParams(searchParams);
@@ -126,6 +127,7 @@ export default function App() {
         <Route path="settings/integrations" element={<Integrations />} />
         <Route path="settings/billing" element={<BillingSettings />} />
       </Route>
+      <Route path="/admin-login" element={<AdminLogin />} />
     </Routes>
   );
 }
